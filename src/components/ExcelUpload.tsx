@@ -1,12 +1,20 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 
-function ExcelUpload() {
+interface Props {
+  participants: any[];
+  setParticipants: React.Dispatch<
+    React.SetStateAction<any[]>
+  >;
+}
+
+function ExcelUpload({
+  participants,
+  setParticipants,
+}: Props) {
+
   const [search, setSearch] =
-  useState("");
-  
-  const [participants, setParticipants] =
-    useState<any[]>([]);
+    useState("");
 
   const handleFile = (
     event: React.ChangeEvent<HTMLInputElement>

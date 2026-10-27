@@ -1,11 +1,25 @@
 import ExcelUpload from "./ExcelUpload";
+import type { Participant } from "../types/Participant";
 
-function ParticipantPage() {
+interface Props {
+  participants: Participant[];
+  setParticipants: React.Dispatch<
+    React.SetStateAction<Participant[]>
+  >;
+}
+
+function ParticipantPage({
+  participants,
+  setParticipants,
+}: Props) {
   return (
     <div>
       <h1>Teilnehmerverwaltung</h1>
 
-      <ExcelUpload />
+      <ExcelUpload
+        participants={participants}
+        setParticipants={setParticipants}
+      />
     </div>
   );
 }

@@ -5,11 +5,17 @@ import {
   Link,
 } from "react-router-dom";
 
+import type { Participant } from "./types/Participant";
 import ParticipantPage from "./components/ParticipantPage";
 import PoolPage from "./components/PoolPage";
 import FightListPage from "./components/FightListPage";
+import { useState } from "react";
 
 function App() {
+
+  const [participants, setParticipants] =
+  useState<Participant[]>([]);
+
   return (
     <BrowserRouter>
       <nav>
@@ -33,17 +39,30 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<ParticipantPage />}
+          element={
+            <ParticipantPage
+              participants={participants}
+              setParticipants={setParticipants}
+            />
+          }
         />
 
         <Route
           path="/pools"
-          element={<PoolPage />}
+          element={
+            <PoolPage
+              participants={participants}
+            />
+          }
         />
 
         <Route
           path="/fightlists"
-          element={<FightListPage />}
+          element={
+            <FightListPage
+              participants={participants}
+            />
+          }
         />
       </Routes>
     </BrowserRouter>
