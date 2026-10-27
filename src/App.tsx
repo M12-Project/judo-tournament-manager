@@ -1,14 +1,52 @@
-import ExcelUpload from "./components/ExcelUpload";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+} from "react-router-dom";
+
+import ParticipantPage from "./components/ParticipantPage";
+import PoolPage from "./components/PoolPage";
+import FightListPage from "./components/FightListPage";
 
 function App() {
   return (
-    <div>
-      <h1>
-        Judo Tournament Manager
-      </h1>
+    <BrowserRouter>
+      <nav>
+        <Link to="/">
+          Teilnehmer
+        </Link>
 
-      <ExcelUpload />
-    </div>
+        {" | "}
+
+        <Link to="/pools">
+          Pools
+        </Link>
+
+        {" | "}
+
+        <Link to="/fightlists">
+          Kampflisten
+        </Link>
+      </nav>
+
+      <Routes>
+        <Route
+          path="/"
+          element={<ParticipantPage />}
+        />
+
+        <Route
+          path="/pools"
+          element={<PoolPage />}
+        />
+
+        <Route
+          path="/fightlists"
+          element={<FightListPage />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

@@ -71,6 +71,46 @@ function ExcelUpload() {
     setParticipants(updated);
   };
 
+  const groupParticipants = () => {
+    const groups = participants.reduce(
+      (acc: any, participant: any) => {
+        const key =
+          `${participant.Altersklasse}-${participant.Geschlecht}`;
+
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+
+        acc[key].push(participant);
+
+        return acc;
+      },
+      {}
+    );
+
+    console.log(groups);
+  };
+
+  const createPools = (
+    participants: any[]
+  ) => {
+    const sorted = [...participants].sort(
+      (a, b) =>
+        Number(a.Gewicht) -
+        Number(b.Gewicht)
+    );
+
+    const pools = [];
+
+    for (let i = 0; i < sorted.length; i += 4) {
+      pools.push(
+        sorted.slice(i, i + 4)
+      );
+    }
+
+    return pools;
+  };
+
   return (
     <div>
       <h2>Excel Import</h2>
@@ -96,6 +136,10 @@ function ExcelUpload() {
       >
         Alle Teilnehmer löschen
       </button>
+
+      <button onClick={groupParticipants}>
+        Gruppen erzeugen
+      </button> 
 
       <p>
         Teilnehmer: {participants.length}
