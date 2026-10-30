@@ -42,19 +42,21 @@ function ExcelUpload({
         XLSX.utils.sheet_to_json(worksheet);
 
       setParticipants((prevParticipants) => [
-      ...prevParticipants,
-      ...(jsonData as any[]),
+        ...prevParticipants,
+        ...(jsonData as any[]),
       ]);
-      console.log(jsonData);
+
+      event.target.value = "";
     };
 
     reader.readAsArrayBuffer(file);
   };
 
-  const deleteParticipant = (indexToDelete: number) => {
-    setParticipants(
-      participants.filter(
-        (_, index) => index !== indexToDelete
+  const deleteParticipant = (participantToDelete: any) => {
+    setParticipants((prevParticipants) =>
+      prevParticipants.filter(
+        (participant) =>
+          participant !== participantToDelete
       )
     );
   };
@@ -69,14 +71,19 @@ function ExcelUpload({
     );
 
   const updateWeight = (
-    index: number,
+    targetParticipant: any,
     value: string
   ) => {
-    const updated = [...participants];
-
-    updated[index].Gewicht = value;
-
-    setParticipants(updated);
+    setParticipants((prevParticipants) =>
+      prevParticipants.map((participant) =>
+        participant === targetParticipant
+          ? {
+              ...participant,
+              Gewicht: value,
+            }
+          : participant
+      )
+    );
   };
 
   const groupParticipants = () => {
@@ -99,24 +106,31 @@ function ExcelUpload({
     console.log(groups);
   };
 
-  const createPools = (
-    participants: any[]
-  ) => {
-    const sorted = [...participants].sort(
-      (a, b) =>
-        Number(a.Gewicht) -
-        Number(b.Gewicht)
-    );
-
-    const pools = [];
-
-    for (let i = 0; i < sorted.length; i += 4) {
-      pools.push(
-        sorted.slice(i, i + 4)
-      );
+  const exportToExcel = () => {
+    if (participants.length === 0) {
+      return;
     }
 
-    return pools;
+    const worksheet = XLSX.utils.json_to_sheet(
+      participants.map((participant) => ({
+        Vorname: participant.Vorname ?? "",
+        Nachname: participant.Nachname ?? "",
+        Jahrgang: participant.Jahrgang ?? "",
+        Geschlecht: participant.Geschlecht ?? "",
+        Gewicht: participant.Gewicht ?? "",
+        Altersklasse: participant.Altersklasse ?? "",
+        Verein: participant.Verein ?? "",
+      }))
+    );
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Teilnehmer"
+    );
+
+    XLSX.writeFile(workbook, "teilnehmer.xlsx");
   };
 
   return (
@@ -147,7 +161,11 @@ function ExcelUpload({
 
       <button onClick={groupParticipants}>
         Gruppen erzeugen
-      </button> 
+      </button>
+
+      <button onClick={exportToExcel}>
+        Excel exportieren
+      </button>
 
       <p>
         Teilnehmer: {participants.length}
@@ -178,7 +196,9 @@ function ExcelUpload({
 
         <tbody>
           {filteredParticipants.map((participant, index) => (
-            <tr key={index}>
+            <tr
+              key={`${participant.Vorname}-${participant.Nachname}-${participant.Jahrgang}-${participant.Verein}-${index}`}
+            >
               <td>{participant.Vorname}</td>
               <td>{participant.Nachname}</td>
               <td>{participant.Jahrgang}</td>
@@ -191,7 +211,7 @@ function ExcelUpload({
                   value={participant.Gewicht}
                   onChange={(e) =>
                     updateWeight(
-                      index,
+                      participant,
                       e.target.value
                     )
                   }
@@ -202,12 +222,12 @@ function ExcelUpload({
               <td>
                 <button
                   onClick={() =>
-                  deleteParticipant(index)
+                    deleteParticipant(participant)
                   }
-                  >
+                >
                   Löschen
                 </button>
-                </td>
+              </td>
             </tr>
           ))}
         </tbody>
