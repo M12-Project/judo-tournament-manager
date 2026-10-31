@@ -16,6 +16,10 @@ function App() {
   const [participants, setParticipants] =
   useState<Participant[]>([]);
 
+  const [poolSystems, setPoolSystems] = useState<
+    Record<string, "POOL" | "KO">
+  >({});
+
   return (
     <BrowserRouter>
       <nav>
@@ -52,6 +56,8 @@ function App() {
           element={
             <PoolPage
               participants={participants}
+              poolSystems={poolSystems}
+              setPoolSystems={setPoolSystems}
             />
           }
         />
@@ -61,6 +67,7 @@ function App() {
           element={
             <FightListPage
               participants={participants}
+              poolSystems={poolSystems}
             />
           }
         />

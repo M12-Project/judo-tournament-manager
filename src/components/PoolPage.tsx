@@ -4,10 +4,20 @@ import {
   buildPoolGroups,
   groupParticipantsByCategory,
 } from "../lib/poolLogic";
-import type { TournamentMode } from "../types/TournamentMode";
 
 interface Props {
   participants: Participant[];
+
+  poolSystems: Record<
+    string,
+    "POOL" | "KO"
+  >;
+
+  setPoolSystems: React.Dispatch<
+    React.SetStateAction<
+      Record<string, "POOL" | "KO">
+    >
+  >;
 }
 
 const buildParticipantKey = (
@@ -35,7 +45,11 @@ const formatWeight = (value: number | string) => {
       : numericValue.toFixed(1).replace(/\.0$/, "");
   };
 
-function PoolPage({ participants }: Props) {
+function PoolPage({
+    participants,
+    poolSystems,
+    setPoolSystems,
+  }: Props) {
   const [maxPoolSize, setMaxPoolSize] = useState(4);
   const [maxWeightSpan, setMaxWeightSpan] = useState(6);
 
@@ -55,10 +69,6 @@ function PoolPage({ participants }: Props) {
   };
   const [manualPoolAssignments, setManualPoolAssignments] = useState<
     Record<string, number>
-  >({});
-
-  const [poolSystems, setPoolSystems] = useState<
-    Record<string, "POOL" | "KO">
   >({});
 
   const groupedParticipants = useMemo(
@@ -157,10 +167,6 @@ function PoolPage({ participants }: Props) {
     return poolSystems[key] ?? "POOL";
   };
 
-  const [groupModes, setGroupModes] = useState<
-    Record<string, TournamentMode>
-  >({});
-
   return (
     <div>
       <h1>Poolgenerator</h1>
@@ -212,25 +218,6 @@ function PoolPage({ participants }: Props) {
               <h3>
                 {groupName} ({fighters.length} Teilnehmer)
               </h3>
-
-              <select
-                value={groupModes[groupName] ?? "POOL"}
-                onChange={(e) =>
-                  setGroupModes((prev) => ({
-                    ...prev,
-                    [groupName]: e.target.value as TournamentMode,
-                  }))
-                }
-              >
-                <option value="POOL">
-                  Pool-System
-                </option>
-
-                <option value="KO">
-                  KO-System
-                </option>
-              </select>
-
               {pools.map((pool, poolIndex) => (
                 <div
                   key={`${groupName}-pool-${poolIndex}`}
