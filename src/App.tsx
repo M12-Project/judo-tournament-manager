@@ -20,6 +20,10 @@ function App() {
     Record<string, "POOL" | "KO">
   >({});
 
+  const [generatedPools, setGeneratedPools] =
+  useState<Record<string, Participant[][]>>({});
+
+
   return (
     <BrowserRouter>
       <nav>
@@ -58,6 +62,7 @@ function App() {
               participants={participants}
               poolSystems={poolSystems}
               setPoolSystems={setPoolSystems}
+              setGeneratedPools={setGeneratedPools}
             />
           }
         />
@@ -66,8 +71,8 @@ function App() {
           path="/fightlists"
           element={
             <FightListPage
-              participants={participants}
               poolSystems={poolSystems}
+              generatedPools={generatedPools}
             />
           }
         />

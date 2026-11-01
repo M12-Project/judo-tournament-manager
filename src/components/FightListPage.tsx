@@ -1,105 +1,170 @@
 import type { Participant } from "../types/Participant";
-import { useMemo } from "react";
-
+import type { PoolType } from "../types/PoolType";
 import {
-  buildPoolGroups,
-} from "../lib/poolLogic";
+  createKnockoutFights,
+  createRoundRobinFights,
+  getPoolType,
+} from "../lib/fightListLogic";
+import {
+  downloadFightListPdf,
+  type FightListPdfSheet,
+  type FightListPdfMode,
+} from "../lib/fightListPdf";
 
 interface Props {
-  participants: Participant[];
-
-  poolSystems: Record<
-    string,
-    "POOL" | "KO"
-  >;
+  poolSystems: Record<string, "POOL" | "KO">;
+  generatedPools: Record<string, Participant[][]>;
 }
 
-function FightListPage({
-  participants,
-  poolSystems,
-}: Props) {
+const formatWeight = (weight: number | string) => {
+  const numericWeight = Number(weight);
 
-  const pools = useMemo(
-    () =>
-      buildPoolGroups(participants, {
-        maxPoolSize: 4,
-        maxWeightSpan: 6,
-      }),
-    [participants]
-  );
+  return Number.isInteger(numericWeight)
+    ? String(numericWeight)
+    : numericWeight.toFixed(1).replace(/\.0$/, "");
+};
+
+const getSystemLabel = (poolType: PoolType | null, poolSize: number) => {
+  if (poolType === "KO") {
+    return "KO-System";
+  }
+
+  return poolType
+    ? `${poolType} - Jeder gegen jeden`
+    : `${poolSize} Teilnehmer - Jeder gegen jeden`;
+};
+
+function FightListPage({ poolSystems, generatedPools }: Props) {
+  const poolSheets: FightListPdfSheet[] = Object.entries(generatedPools)
+    .flatMap(([groupName, pools]) =>
+      pools.flatMap((participants, poolIndex) => {
+        if (participants.length === 0) {
+          return [];
+        }
+
+        return [{
+          groupName,
+          poolIndex,
+          participants,
+          system: poolSystems[`${groupName}-${poolIndex}`] ?? "POOL",
+        }];
+      })
+    );
+
+  const downloadSelectedPdf = (
+    sheet: FightListPdfSheet,
+    mode: FightListPdfMode
+  ) => downloadFightListPdf([sheet], mode);
+
+  if (poolSheets.length === 0) {
+    return (
+      <div>
+        <h1>Kampflisten</h1>
+        <p>Es gibt noch keine Pools. Erzeuge oder bearbeite zuerst die Pools.</p>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h1>Kampflisten</h1>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1>Kampflisten</h1>
+          <p>{poolSheets.length} Pools aus der finalen Einteilung</p>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <button onClick={() => downloadFightListPdf(poolSheets, "fights")}>
+            Alle Kampflisten als PDF
+          </button>
+          <button onClick={() => downloadFightListPdf(poolSheets, "participants")}>
+            Alle Teilnehmerlisten als PDF
+          </button>
+        </div>
+      </div>
 
-      {Object.entries(pools).map(
-        ([groupName, groupPools]) =>
-          groupPools.map((pool, poolIndex) => {
-            const system =
-              poolSystems[
-                `${groupName}-${poolIndex}`
-              ] ?? "POOL";
+      {poolSheets.map((sheet) => {
+        const { groupName, poolIndex, participants, system } = sheet;
+        const poolType = getPoolType(participants.length, system);
+        const fights = system === "KO"
+          ? createKnockoutFights(participants)
+          : createRoundRobinFights(participants);
+        const poolLabel = String.fromCharCode(65 + poolIndex);
 
-            return (
-              <div
-                key={`${groupName}-${poolIndex}`}
-                style={{
-                  border: "1px solid #ddd",
-                  padding: "1rem",
-                  marginBottom: "1rem",
-                }}
-              >
-                <h3>
-                  {groupName} - Pool{" "}
-                  {String.fromCharCode(
-                    65 + poolIndex
-                  )}
-                </h3>
-
+        return (
+          <section
+            key={`${groupName}-${poolIndex}`}
+            style={{
+              borderTop: "1px solid #ccc",
+              padding: "1rem 0",
+              marginTop: "1rem",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "1rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h2>{groupName} - Pool {poolLabel}</h2>
                 <p>
-                  Teilnehmer: {pool.length}
+                  {participants.length} Teilnehmer · {getSystemLabel(poolType, participants.length)} · {fights.length} Kämpfe
                 </p>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <button onClick={() => downloadSelectedPdf(sheet, "fights")}>
+                  Kampfliste PDF
+                </button>
+                <button onClick={() => downloadSelectedPdf(sheet, "participants")}>
+                  Teilnehmerliste PDF
+                </button>
+              </div>
+            </div>
 
-                <p>
-                  Kampfsystem:{" "}
-                  {system === "POOL"
-                    ? "Pool-System"
-                    : "KO-System"}
-                </p>
+            <h3>Teilnehmer</h3>
+            <ol>
+              {participants.map((participant, index) => (
+                <li key={`${participant.Vorname}-${participant.Nachname}-${index}`}>
+                  {participant.Vorname} {participant.Nachname} - {formatWeight(participant.Gewicht)} kg ({participant.Verein})
+                </li>
+              ))}
+            </ol>
 
-                <h4>Teilnehmer</h4>
-
-                <ul>
-                  {pool.map((fighter) => (
-                    <li
-                      key={`${fighter.Vorname}-${fighter.Nachname}`}
-                    >
-                      {fighter.Vorname}{" "}
-                      {fighter.Nachname}
-                      {" - "}
-                      {fighter.Gewicht} kg
+            {system === "KO" ? (
+              <>
+                <h3>KO-Kampffolge</h3>
+                {fights.map((fight) => (
+                  <p key={fight.matchNumber}>
+                    Kampf {fight.matchNumber}, Runde {fight.roundNumber}: {fight.first.label} gegen {fight.second.label}
+                  </p>
+                ))}
+              </>
+            ) : (
+              <>
+                <h3>Kampffolge</h3>
+                <ol>
+                  {fights.map((fight) => (
+                    <li key={fight.matchNumber}>
+                      Runde {fight.roundNumber}: {fight.first.label} gegen {fight.second.label}
                     </li>
                   ))}
-                </ul>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "0.5rem",
-                    marginTop: "1rem",
-                  }}
-                >
-                  <button>
-                    Kampfliste PDF
-                  </button>
-
-                  <button>
-                    Teilnehmerliste PDF
-                  </button>
-                </div>
-              </div>
-            );
-          })
-      )}
+                </ol>
+              </>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

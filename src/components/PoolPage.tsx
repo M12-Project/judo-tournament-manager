@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Participant } from "../types/Participant";
 import {
   buildPoolGroups,
@@ -16,6 +16,12 @@ interface Props {
   setPoolSystems: React.Dispatch<
     React.SetStateAction<
       Record<string, "POOL" | "KO">
+    >
+  >;
+
+  setGeneratedPools: React.Dispatch<
+    React.SetStateAction<
+      Record<string, Participant[][]>
     >
   >;
 }
@@ -45,11 +51,73 @@ const formatWeight = (value: number | string) => {
       : numericValue.toFixed(1).replace(/\.0$/, "");
   };
 
+const getPoolIndexForParticipant = (
+  groupName: string,
+  participant: Participant,
+  manualPoolAssignments: Record<string, number>,
+  suggestedGroups: Record<string, Participant[][]>
+) => {
+  const key = `${groupName}|${buildParticipantKey(participant)}`;
+
+  if (manualPoolAssignments[key] !== undefined) {
+    return manualPoolAssignments[key];
+  }
+
+  const suggestedPoolIndex =
+    suggestedGroups[groupName]?.findIndex((pool) =>
+      pool.some(
+        (fighter) =>
+          buildParticipantKey(fighter) === buildParticipantKey(participant)
+      )
+    ) ?? -1;
+
+  return suggestedPoolIndex >= 0 ? suggestedPoolIndex : 0;
+};
+
+const getVisiblePoolsForGroup = (
+  groupName: string,
+  groupedParticipants: Record<string, Participant[]>,
+  suggestedGroups: Record<string, Participant[][]>,
+  manualPoolAssignments: Record<string, number>
+) => {
+  const fighters = groupedParticipants[groupName] ?? [];
+  const poolCount = Math.max(
+    suggestedGroups[groupName]?.length ?? 1,
+    ...fighters.map(
+      (fighter) =>
+        getPoolIndexForParticipant(
+          groupName,
+          fighter,
+          manualPoolAssignments,
+          suggestedGroups
+        ) + 1
+    ),
+    1
+  );
+
+  const pools = Array.from({ length: poolCount }, () => [] as Participant[]);
+
+  fighters.forEach((fighter) => {
+    const poolIndex = getPoolIndexForParticipant(
+      groupName,
+      fighter,
+      manualPoolAssignments,
+      suggestedGroups
+    );
+    pools[poolIndex].push(fighter);
+  });
+
+  return pools.map((pool) =>
+    [...pool].sort((a, b) => Number(a.Gewicht) - Number(b.Gewicht))
+  );
+};
+
 function PoolPage({
-    participants,
-    poolSystems,
-    setPoolSystems,
-  }: Props) {
+  participants,
+  poolSystems,
+  setPoolSystems,
+  setGeneratedPools,
+}: Props) {
   const [maxPoolSize, setMaxPoolSize] = useState(4);
   const [maxWeightSpan, setMaxWeightSpan] = useState(6);
 
@@ -85,57 +153,18 @@ function PoolPage({
     [participants, maxPoolSize, maxWeightSpan]
   );
 
-  const getPoolIndexForParticipant = (
-    groupName: string,
-    participant: Participant
-  ) => {
-    const key = `${groupName}|${buildParticipantKey(participant)}`;
-
-    if (manualPoolAssignments[key] !== undefined) {
-      return manualPoolAssignments[key];
-    }
-
-    const suggestedPoolIndex =
-      suggestedGroups[groupName]?.findIndex((pool) =>
-        pool.some(
-          (fighter) =>
-            buildParticipantKey(fighter) ===
-            buildParticipantKey(participant)
-        )
-      ) ?? -1;
-
-    return suggestedPoolIndex >= 0 ? suggestedPoolIndex : 0;
-  };
-
-  const getVisiblePoolsForGroup = (groupName: string) => {
-    const fighters = groupedParticipants[groupName] ?? [];
-    const poolCount = Math.max(
-      suggestedGroups[groupName]?.length ?? 1,
-      ...fighters.map(
-        (fighter) =>
-          getPoolIndexForParticipant(groupName, fighter) + 1
-      ),
-      1
-    );
-
-    const pools = Array.from({ length: poolCount }, () => [] as Participant[]);
-
-    fighters.forEach((fighter) => {
-      const poolIndex = getPoolIndexForParticipant(groupName, fighter);
-      pools[poolIndex].push(fighter);
-    });
-
-    return pools
-      .filter((pool) => pool.length > 0)
-      .map((pool) => [...pool].sort((a, b) => Number(a.Gewicht) - Number(b.Gewicht)));
-  };
-
   const getSelectablePoolCount = (groupName: string) => {
     const fighters = groupedParticipants[groupName] ?? [];
     const maxManualIndex = Math.max(
       1,
       ...fighters.map(
-        (fighter) => getPoolIndexForParticipant(groupName, fighter) + 1
+        (fighter) =>
+          getPoolIndexForParticipant(
+            groupName,
+            fighter,
+            manualPoolAssignments,
+            suggestedGroups
+          ) + 1
       )
     );
 
@@ -166,6 +195,31 @@ function PoolPage({
 
     return poolSystems[key] ?? "POOL";
   };
+
+  const finalizedPools = useMemo(
+    () =>
+      Object.keys(groupedParticipants).reduce<Record<string, Participant[][]>>(
+        (result, groupName) => {
+          result[groupName] = getVisiblePoolsForGroup(
+            groupName,
+            groupedParticipants,
+            suggestedGroups,
+            manualPoolAssignments
+          );
+          return result;
+        },
+        {}
+      ),
+    [groupedParticipants, suggestedGroups, manualPoolAssignments]
+  );
+
+  useEffect(() => {
+    setGeneratedPools((currentPools) =>
+      JSON.stringify(currentPools) === JSON.stringify(finalizedPools)
+        ? currentPools
+        : finalizedPools
+    );
+  }, [finalizedPools, setGeneratedPools]);
 
   return (
     <div>
@@ -210,7 +264,12 @@ function PoolPage({
 
       {Object.entries(groupedParticipants).map(
         ([groupName, fighters]) => {
-          const pools = getVisiblePoolsForGroup(groupName);
+          const pools = getVisiblePoolsForGroup(
+            groupName,
+            groupedParticipants,
+            suggestedGroups,
+            manualPoolAssignments
+          );
           const selectablePoolCount = getSelectablePoolCount(groupName);
 
           return (
@@ -218,7 +277,12 @@ function PoolPage({
               <h3>
                 {groupName} ({fighters.length} Teilnehmer)
               </h3>
-              {pools.map((pool, poolIndex) => (
+              {pools.map((pool, poolIndex) => {
+                if (pool.length === 0) {
+                  return null;
+                }
+
+                return (
                 <div
                   key={`${groupName}-pool-${poolIndex}`}
                   style={{
@@ -277,7 +341,12 @@ function PoolPage({
                         Pool: {" "}
                         <select
                           value={String(
-                            getPoolIndexForParticipant(groupName, fighter)
+                            getPoolIndexForParticipant(
+                              groupName,
+                              fighter,
+                              manualPoolAssignments,
+                              suggestedGroups
+                            )
                           )}
                           onChange={(event) =>
                             handleManualPoolChange(
@@ -300,7 +369,8 @@ function PoolPage({
                     </div>
                   ))}
                 </div>
-              ))}
+                );
+              })}
             </div>
           );
         }
