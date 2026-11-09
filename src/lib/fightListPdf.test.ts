@@ -205,4 +205,75 @@ describe("createFightListPdf", () => {
       expect(getFightListPdfFilename([sheet, { ...sheet, poolIndex: 1 }], "fights"))
         .toBe("Judo-U11-Weiblich-Alle-Pools-Kampflisten.pdf");
     });
+
+    it("exports knockout fights with explicit winner and loser routes", async () => {
+      const eightParticipants = Array.from({ length: 8 }, (_, index) => ({
+        ...participants[index % participants.length],
+        Vorname: `Judoka${index + 1}`,
+      }));
+      const pdf = await createFightListPdf(
+        [{
+          groupName: "U15 - weiblich",
+          poolIndex: 0,
+          participants: eightParticipants,
+          system: "KO",
+        }],
+        "fights"
+      );
+      const pdfContent = pdf.output();
+
+      expect(pdf.internal.pageSize.getWidth()).toBeGreaterThan(
+        pdf.internal.pageSize.getHeight()
+      );
+      expect(pdfContent).toContain("Doppel-KO Kampfliste");
+      expect(pdfContent).toContain("Sieger ->");
+      expect(pdfContent).toContain("Verlierer ->");
+      expect(pdfContent).toContain("Verliererrunde");
+      expect(pdfContent).toContain("zweiten Niederlage");
+      expect(pdfContent).toContain("Finale 2");
+      expect(pdfContent).toContain("Eintragen: Sieger Kampf");
+      expect(pdfContent).toContain("Eintragen: Verlierer Kampf");
+      expect(pdfContent).toContain("1. Platz");
+      expect(pdfContent).toContain("8. Platz");
+    });
+
+    it("lays out a 16-person double-KO tournament in six-fight pages", async () => {
+      const sixteenParticipants = Array.from({ length: 16 }, (_, index) => ({
+        ...participants[index % participants.length],
+        Vorname: `Judoka${index + 1}`,
+      }));
+      const pdf = await createFightListPdf(
+        [{
+          groupName: "U15 - männlich",
+          poolIndex: 0,
+          participants: sixteenParticipants,
+          system: "KO",
+        }],
+        "fights"
+      );
+      const pdfContent = pdf.output();
+
+      expect(pdf.getNumberOfPages()).toBe(6);
+      expect(pdfContent).toContain("16. Platz");
+      expect(pdfContent).toContain("VERLIERERRUNDE");
+      expect(pdfContent).toContain("Eintragen: Sieger Kampf");
+    });
+
+    it("leaves a handwritten name field for a participant advancing by bye", async () => {
+      const fiveParticipants = Array.from({ length: 5 }, (_, index) => ({
+        ...participants[index % participants.length],
+        Vorname: `Judoka${index + 1}`,
+      }));
+      const pdf = await createFightListPdf(
+        [{
+          groupName: "U15 - männlich",
+          poolIndex: 0,
+          participants: fiveParticipants,
+          system: "KO",
+        }],
+        "fights"
+      );
+
+      expect(pdf.output()).toContain("Eintragen: Freilos - Judoka5 Muster");
+    });
 });

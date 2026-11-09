@@ -3,6 +3,7 @@ import type { Participant } from "../types/Participant";
 import type { PoolType } from "../types/PoolType";
 import {
   createKnockoutFights,
+  createDoubleKnockoutFights,
   createRoundRobinFights,
   getPoolType,
 } from "./fightListLogic";
@@ -69,8 +70,9 @@ export function getFightListPdfFilename(
     );
     const weightLabel = `${formatWeight(highestWeight)}kg`;
     const poolLabel = `Pool-${String.fromCharCode(65 + sheet.poolIndex)}`;
+    const systemLabel = sheet.system === "KO" ? "Doppel-KO-" : "";
 
-    return `${categoryLabel}-bis-${weightLabel}-${poolLabel}-${documentType}.pdf`;
+    return `${categoryLabel}-bis-${weightLabel}-${poolLabel}-${systemLabel}${documentType}.pdf`;
   }
 
   const scopeLabel = categories.length === 1 ? "Alle-Pools" : "Alle-Gruppen";
@@ -79,7 +81,7 @@ export function getFightListPdfFilename(
 
 const getPoolTypeLabel = (poolType: PoolType | null, poolSize: number) => {
   if (poolType === "KO") {
-    return "KO-System";
+    return "Doppel-KO-System";
   }
 
   return poolType
@@ -173,8 +175,8 @@ const drawPoolRoundLayout = (
   const pageWidth = pdf.internal.pageSize.getWidth();
   const margin = 12;
   const gap = 5;
-  const cardHeight = 35;
-  const cardGap = 4;
+  const cardHeight = 40;
+  const cardGap = 3;
   const topStep = 7;
 
   roundsPerPage.forEach((pageRounds, pageIndex) => {
@@ -244,8 +246,16 @@ const drawPoolRoundLayout = (
         pdf.setDrawColor(175, 180, 178);
         pdf.line(x + 2, cardY + 24, x + columnWidth - 2, cardY + 24);
         pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
-        pdf.text("Wertung: __________________    Zeit: __________", nameX, cardY + 31);
+        pdf.setFontSize(6.5);
+        pdf.text("Wertung:", nameX, cardY + 34);
+        pdf.line(nameX + 15, cardY + 35, x + columnWidth * 0.6, cardY + 35);
+        pdf.text("Zeit:", x + columnWidth * 0.64, cardY + 34);
+        pdf.line(
+          x + columnWidth * 0.75,
+          cardY + 35,
+          x + columnWidth - 2,
+          cardY + 35
+        );
       });
     });
 
@@ -258,6 +268,179 @@ const drawPoolRoundLayout = (
       { align: "right" }
     );
   });
+};
+
+const drawDoubleKnockoutSheet = (
+  pdf: jsPDF,
+  sheet: FightListPdfSheet
+) => {
+  const { groupName, poolIndex, participants } = sheet;
+  const poolLabel = String.fromCharCode(65 + poolIndex);
+  const fights = createDoubleKnockoutFights(participants);
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const weights = participants
+    .map((participant) => Number(participant.Gewicht))
+    .filter(Number.isFinite);
+  const maxWeight = weights.length > 0 ? Math.max(...weights) : 0;
+  const placementColumns = Math.min(8, participants.length);
+  const placementRows = Math.ceil(participants.length / placementColumns);
+  const placementGap = 2;
+  const placementWidth =
+    (pageWidth - 24 - placementGap * (placementColumns - 1)) /
+    placementColumns;
+  const cardHeight = 45;
+  const cardGapY = 1;
+  const cardGapX = 5;
+  const startY = 37 + placementRows * 12 + 3;
+  const cardWidth = (pageWidth - 24 - cardGapX) / 2;
+  const fightsPerPage = 6;
+  const pageCount = Math.max(1, Math.ceil(fights.length / fightsPerPage));
+
+  const drawHeader = (pageNumber: number) => {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.text("Doppel-KO Kampfliste", 12, 14);
+    pdf.setFontSize(11);
+    pdf.text(`${groupName} - Pool ${poolLabel} (${participants.length} Teilnehmer)`, 12, 21);
+    pdf.setFontSize(9);
+    pdf.text(`Höchstgewicht: ${formatWeight(maxWeight)} kg`, pageWidth - 12, 21, {
+      align: "right",
+    });
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7);
+    pdf.text(
+      "Sieger: obere Runde / weiter. Verlierer: Verliererrunde; nach der zweiten Niederlage ausgeschieden.",
+      12,
+      27
+    );
+    pdf.text(
+      "Name in späteren Kämpfen nach dem angegebenen Quellkampf handschriftlich eintragen. Finale 2 nur bei Bedarf.",
+      12,
+      32
+    );
+
+    for (let place = 1; place <= participants.length; place += 1) {
+      const row = Math.floor((place - 1) / placementColumns);
+      const column = (place - 1) % placementColumns;
+      const x = 12 + column * (placementWidth + placementGap);
+      const y = 37 + row * 12;
+
+      pdf.setDrawColor(85, 95, 92);
+      pdf.setLineWidth(0.3);
+      pdf.rect(x, y, placementWidth, 10);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(6.5);
+      pdf.text(`${place}. Platz`, x + 1.5, y + 4);
+      pdf.line(x + 1.5, y + 8, x + placementWidth - 1.5, y + 8);
+    }
+
+    pdf.setFontSize(7);
+    pdf.text(`Seite ${pageNumber} von ${pageCount}`, pageWidth - 12, pageHeight - 5, {
+      align: "right",
+    });
+  };
+
+  const stageColor = (stage: "upper" | "lower" | "final") => {
+    if (stage === "upper") {
+      return [222, 239, 252] as const;
+    }
+
+    if (stage === "lower") {
+      return [255, 232, 232] as const;
+    }
+
+    return [239, 230, 250] as const;
+  };
+
+  const drawFightCard = (
+    fight: ReturnType<typeof createDoubleKnockoutFights>[number],
+    positionInPage: number
+  ) => {
+    const column = Math.floor(positionInPage / 3);
+    const row = positionInPage % 3;
+    const x = 12 + column * (cardWidth + cardGapX);
+    const y = startY + row * (cardHeight + cardGapY);
+    const color = stageColor(fight.stage);
+    const stageLabel = fight.stage === "upper"
+      ? "OBERE RUNDE"
+      : fight.stage === "lower"
+        ? "VERLIERERRUNDE"
+        : fight.roundNumber === 1
+          ? "FINALE 1"
+          : "FINALE 2 - NUR BEI BEDARF";
+
+    pdf.setDrawColor(80, 90, 100);
+    pdf.setLineWidth(0.45);
+    pdf.roundedRect(x, y, cardWidth, cardHeight, 1.5, 1.5, "S");
+    pdf.setFillColor(color[0], color[1], color[2]);
+    pdf.roundedRect(x, y, cardWidth, 9, 1.5, 1.5, "F");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(8);
+    pdf.text(`KAMPF ${fight.matchNumber}`, x + 3, y + 6);
+    pdf.setFontSize(7);
+    pdf.text(`${stageLabel} - RUNDE ${fight.roundNumber}`, x + 31, y + 6);
+
+    [fight.first, fight.second].forEach((competitor, competitorIndex) => {
+      const rowY = y + 10 + competitorIndex * 8;
+      const prefilledName =
+        fight.stage === "upper" &&
+        fight.roundNumber === 1 &&
+        Boolean(competitor.participant);
+      const sourceHint = prefilledName
+        ? ""
+        : competitor.participant
+          ? `Eintragen: Freilos - ${competitor.label}`
+          : `Eintragen: ${competitor.label}`;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.text(`${competitorIndex + 1}.`, x + 3, rowY + 3);
+
+      if (prefilledName) {
+        pdf.setFontSize(8);
+        pdf.text(competitor.label, x + 12, rowY + 3);
+      } else {
+        pdf.setDrawColor(130, 135, 140);
+        pdf.line(x + 12, rowY + 4, x + cardWidth - 3, rowY + 4);
+        pdf.setTextColor(95, 95, 95);
+        pdf.setFontSize(6);
+        pdf.text(sourceHint, x + 12, rowY + 8);
+        pdf.setTextColor(0, 0, 0);
+      }
+    });
+
+    const routeY = y + 28;
+    pdf.setDrawColor(190, 195, 200);
+    pdf.line(x + 3, routeY - 2, x + cardWidth - 3, routeY - 2);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(6.5);
+    pdf.text(`Sieger -> ${fight.winnerDestination}`, x + 3, routeY + 3);
+    pdf.text(`Verlierer -> ${fight.loserDestination}`, x + 3, routeY + 7);
+    pdf.setFontSize(6.5);
+    pdf.text("Wertung:", x + 3, y + 42);
+    pdf.line(x + 20, y + 43, x + cardWidth * 0.6, y + 43);
+    pdf.text("Zeit:", x + cardWidth * 0.64, y + 42);
+    pdf.line(
+      x + cardWidth * 0.75,
+      y + 43,
+      x + cardWidth - 3,
+      y + 43
+    );
+  };
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    if (pageIndex > 0) {
+      pdf.addPage("a4", "landscape");
+    }
+
+    drawHeader(pageIndex + 1);
+    fights
+      .slice(pageIndex * fightsPerPage, (pageIndex + 1) * fightsPerPage)
+      .forEach((fight, index) => {
+        drawFightCard(fight, index);
+      });
+  }
 };
 
 const drawSheet = (
@@ -292,6 +475,11 @@ const drawSheet = (
       maxWeight,
       participantCount: participants.length,
     });
+    return;
+  }
+
+  if (mode === "fights" && system === "KO") {
+    drawDoubleKnockoutSheet(pdf, sheet);
     return;
   }
 
@@ -390,13 +578,13 @@ export async function createFightListPdf(
   ]);
 
   const firstSheet = sheets[0];
-  const firstOrientation = mode === "fights" && firstSheet?.system === "POOL"
+  const firstOrientation = mode === "fights" && firstSheet?.system !== undefined
     ? "landscape"
     : "portrait";
   const pdf = new jsPDF({ orientation: firstOrientation, unit: "mm", format: "a4" });
 
   sheets.forEach((sheet, index) => {
-    const orientation = mode === "fights" && sheet.system === "POOL"
+    const orientation = mode === "fights"
       ? "landscape"
       : "portrait";
 

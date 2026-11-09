@@ -318,7 +318,7 @@ function PoolPage({
                     </option>
 
                     <option value="KO">
-                      KO-System
+                      Doppel-KO-System
                     </option>
                   </select>
                 </div>

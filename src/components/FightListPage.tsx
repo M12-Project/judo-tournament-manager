@@ -1,7 +1,7 @@
 import type { Participant } from "../types/Participant";
 import type { PoolType } from "../types/PoolType";
 import {
-  createKnockoutFights,
+  createDoubleKnockoutFights,
   createRoundRobinFights,
   getPoolType,
 } from "../lib/fightListLogic";
@@ -26,7 +26,7 @@ const formatWeight = (weight: number | string) => {
 
 const getSystemLabel = (poolType: PoolType | null, poolSize: number) => {
   if (poolType === "KO") {
-    return "KO-System";
+    return "Doppel-KO-System";
   }
 
   return poolType
@@ -93,8 +93,11 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
       {poolSheets.map((sheet) => {
         const { groupName, poolIndex, participants, system } = sheet;
         const poolType = getPoolType(participants.length, system);
+        const doubleKoFights = system === "KO"
+          ? createDoubleKnockoutFights(participants)
+          : [];
         const fights = system === "KO"
-          ? createKnockoutFights(participants)
+          ? doubleKoFights
           : createRoundRobinFights(participants);
         const poolLabel = String.fromCharCode(65 + poolIndex);
 
@@ -143,10 +146,13 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
 
             {system === "KO" ? (
               <>
-                <h3>KO-Kampffolge</h3>
-                {fights.map((fight) => (
+                <h3>Doppel-KO-Kampffolge</h3>
+                <p>
+                  Sieger rücken in der oberen Runde auf. Verlierer wechseln in die Verliererrunde; nach der zweiten Niederlage scheiden sie aus.
+                </p>
+                {doubleKoFights.map((fight) => (
                   <p key={fight.matchNumber}>
-                    Kampf {fight.matchNumber}, Runde {fight.roundNumber}: {fight.first.label} gegen {fight.second.label}
+                    Kampf {fight.matchNumber} ({fight.stage}, Runde {fight.roundNumber}): {fight.first.label} gegen {fight.second.label}. Sieger: {fight.winnerDestination}. Verlierer: {fight.loserDestination}.
                   </p>
                 ))}
               </>
