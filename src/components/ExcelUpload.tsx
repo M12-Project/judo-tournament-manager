@@ -127,26 +127,6 @@ function ExcelUpload({
     );
   };
 
-  const groupParticipants = () => {
-    const groups = participants.reduce(
-      (acc: any, participant: any) => {
-        const key =
-          `${participant.Altersklasse}-${participant.Geschlecht}`;
-
-        if (!acc[key]) {
-          acc[key] = [];
-        }
-
-        acc[key].push(participant);
-
-        return acc;
-      },
-      {}
-    );
-
-    console.log(groups);
-  };
-
   const exportToExcel = () => {
     if (participants.length === 0) {
       return;
@@ -175,145 +155,152 @@ function ExcelUpload({
   };
 
   return (
-    <div>
-      <h2>Excel Import</h2>
+    <section className="workspace-panel">
+      <div className="workspace-panel-header flex-wrap">
+        <div>
+          <h2>Teilnehmerliste</h2>
+          <div className="small text-secondary mt-1">Excel-Datei importieren oder Wiegedaten direkt bearbeiten</div>
+        </div>
+        <div className="d-flex flex-wrap gap-2">
+          <label className="btn btn-outline-primary mb-0">
+            Excel importieren
+            <input
+              className="visually-hidden"
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFile}
+            />
+          </label>
+          <button className="btn btn-primary" onClick={exportToExcel}>
+            Excel exportieren
+          </button>
+          <button
+            className="btn btn-outline-danger"
+            onClick={() => {
+              if (window.confirm("Wirklich alle Teilnehmer löschen?")) {
+                setParticipants([]);
+              }
+            }}
+          >
+            Alle löschen
+          </button>
+        </div>
+      </div>
 
-      <input
-        type="file"
-        accept=".xlsx,.xls"
-        onChange={handleFile}
-      />
+      <div className="workspace-panel-body">
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+          <div className="d-flex flex-wrap gap-2">
+            <span className="stat-chip">{participants.length} Teilnehmer</span>
+            <span className="stat-chip">
+              {participants.reduce(
+                (total, participant) => total + getParticipantAgeClasses(participant).length,
+                0
+              )} Starts
+            </span>
+          </div>
+          <div className="participant-search">
+            <input
+              className="form-control"
+              type="search"
+              placeholder="Name suchen ..."
+              aria-label="Teilnehmer suchen"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+        </div>
 
-      <hr />
+        {participants.length === 0 ? (
+          <div className="empty-state">
+            <h2>Noch keine Teilnehmer</h2>
+            <p>Importiere eine Excel-Liste, um mit der Einteilung zu beginnen.</p>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Vorname</th>
+                  <th>Nachname</th>
+                  <th>Jahrgang</th>
+                  <th>Geschlecht</th>
+                  <th>Gewicht</th>
+                  <th>Starts</th>
+                  <th>Verein</th>
+                  <th className="text-end">Aktion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredParticipants.map((participant, index) => {
+                  const participantKey = getParticipantKey(participant, index);
+                  const ageClasses = getParticipantAgeClasses(participant);
+                  const ageClassValue = ageClasses.join(", ");
+                  const hasExistingChoice = !ageClassChoices.some(
+                    (choice) => choice.value === ageClassValue
+                  );
 
-      <button
-        onClick={() => {
-          if (
-            window.confirm(
-              "Wirklich alle Teilnehmer löschen?"
-            )
-          ) {
-            setParticipants([]);
-          }
-        }}
-      >
-        Alle Teilnehmer löschen
-      </button>
-
-      <button onClick={groupParticipants}>
-        Gruppen erzeugen
-      </button>
-
-      <button onClick={exportToExcel}>
-        Excel exportieren
-      </button>
-
-      <p>
-        Teilnehmer: {participants.length} · Starts: {participants.reduce(
-          (total, participant) => total + getParticipantAgeClasses(participant).length,
-          0
-        )}
-      </p>
-
-      <input
-        type="text"
-        placeholder="Teilnehmer suchen..."
-        value={search}
-        onChange={(e) =>
-          setSearch(e.target.value)
-        }
-      />
-
-      <table>
-        <thead>
-          <tr>
-            <th>Vorname</th>
-            <th>Nachname</th>
-            <th>Jahrgang</th>
-            <th>Geschlecht</th>
-            <th>Gewicht</th>
-            <th>Starts / Altersklassen</th>
-            <th>Verein</th>
-            <th>Aktion</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {filteredParticipants.map((participant, index) => {
-            const participantKey = getParticipantKey(participant, index);
-            const ageClasses = getParticipantAgeClasses(participant);
-            const ageClassValue = ageClasses.join(", ");
-            const hasExistingChoice = !ageClassChoices.some(
-              (choice) => choice.value === ageClassValue
-            );
-
-            return (
-            <tr
-              key={participantKey}
-            >
-              <td>{participant.Vorname}</td>
-              <td>{participant.Nachname}</td>
-              <td>{participant.Jahrgang}</td>
-              <td>{participant.Geschlecht}</td>
-              <td>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={participant.Gewicht}
-                  onChange={(e) =>
-                    updateWeight(
-                      participant,
-                      e.target.value
-                    )
-                  }
-                />
-              </td>
-              <td>
-                <select
-                  aria-label={`Altersklassen für ${participant.Vorname} ${participant.Nachname}`}
-                  value={ageClassValue}
-                  onChange={(event) =>
-                    setParticipants((prevParticipants) =>
-                      prevParticipants.map((currentParticipant) =>
-                        currentParticipant === participant
-                          ? setParticipantAgeClasses(
-                              currentParticipant,
-                              event.target.value
+                  return (
+                    <tr key={participantKey}>
+                      <td className="fw-semibold">{participant.Vorname}</td>
+                      <td className="fw-semibold">{participant.Nachname}</td>
+                      <td>{participant.Jahrgang}</td>
+                      <td>{participant.Geschlecht}</td>
+                      <td>
+                        <div className="input-group input-group-sm weight-input">
+                          <input
+                            className="form-control"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            aria-label={`Gewicht ${participant.Vorname} ${participant.Nachname}`}
+                            value={participant.Gewicht}
+                            onChange={(event) => updateWeight(participant, event.target.value)}
+                          />
+                          <span className="input-group-text">kg</span>
+                        </div>
+                      </td>
+                      <td>
+                        <select
+                          className="form-select form-select-sm age-class-select"
+                          aria-label={`Altersklassen für ${participant.Vorname} ${participant.Nachname}`}
+                          value={ageClassValue}
+                          onChange={(event) =>
+                            setParticipants((prevParticipants) =>
+                              prevParticipants.map((currentParticipant) =>
+                                currentParticipant === participant
+                                  ? setParticipantAgeClasses(currentParticipant, event.target.value)
+                                  : currentParticipant
+                              )
                             )
-                          : currentParticipant
-                      )
-                    )
-                  }
-                >
-                  {hasExistingChoice && (
-                    <option value={ageClassValue}>
-                      {ageClasses.join(" + ")}
-                    </option>
-                  )}
-                  {ageClassChoices.map((choice) => (
-                    <option key={choice.value} value={choice.value}>
-                      {choice.label}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>{participant.Verein}</td>
-              <td>
-                <button
-                  onClick={() =>
-                    deleteParticipant(participant)
-                  }
-                >
-                  Löschen
-                </button>
-              </td>
-            </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                          }
+                        >
+                          {hasExistingChoice && (
+                            <option value={ageClassValue}>{ageClasses.join(" + ")}</option>
+                          )}
+                          {ageClassChoices.map((choice) => (
+                            <option key={choice.value} value={choice.value}>{choice.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>{participant.Verein}</td>
+                      <td className="text-end">
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          aria-label={`Teilnehmer ${participant.Vorname} ${participant.Nachname} löschen`}
+                          onClick={() => deleteParticipant(participant)}
+                        >
+                          Löschen
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

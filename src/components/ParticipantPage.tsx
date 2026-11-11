@@ -13,8 +13,14 @@ function ParticipantPage({
   setParticipants,
 }: Props) {
   return (
-    <div>
-      <h1>Teilnehmerverwaltung</h1>
+    <div className="participant-page">
+      <div className="page-heading">
+        <div>
+          <div className="page-kicker">Wettkampf vorbereiten</div>
+          <h1>Teilnehmer</h1>
+          <p>Teilnehmer importieren, wiegen und Starts verwalten.</p>
+        </div>
+      </div>
 
       <ExcelUpload
         participants={participants}
