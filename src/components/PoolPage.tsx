@@ -4,6 +4,7 @@ import {
   buildPoolGroups,
   groupParticipantsByCategory,
 } from "../lib/poolLogic";
+import { expandParticipantsIntoStarts } from "../lib/participantStarts";
 
 interface Props {
   participants: Participant[];
@@ -30,6 +31,7 @@ const buildParticipantKey = (
   participant: Participant
 ) =>
   [
+    participant.id ?? "",
     participant.Vorname,
     participant.Nachname,
     participant.Gewicht,
@@ -140,13 +142,15 @@ function PoolPage({
   >({});
 
   const groupedParticipants = useMemo(
-    () => groupParticipantsByCategory(participants),
+    () => groupParticipantsByCategory(
+      expandParticipantsIntoStarts(participants)
+    ),
     [participants]
   );
 
   const suggestedGroups = useMemo(
     () =>
-      buildPoolGroups(participants, {
+      buildPoolGroups(expandParticipantsIntoStarts(participants), {
         maxPoolSize,
         maxWeightSpan,
       }),

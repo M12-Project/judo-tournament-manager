@@ -62,38 +62,113 @@ export function createRoundRobinFights(
     return [];
   }
 
-  const fighters: Array<Participant | null> = [...participants];
+  type Pairing = { first: number; second: number; sameClub: boolean };
+  type Round = Pairing[];
 
-  if (fighters.length % 2 !== 0) {
-    fighters.push(null);
-  }
+  const isSameClub = (firstIndex: number, secondIndex: number) => {
+    const firstClub = participants[firstIndex].Verein.trim().toLocaleLowerCase("de-DE");
+    const secondClub = participants[secondIndex].Verein.trim().toLocaleLowerCase("de-DE");
 
-  const fights: ScheduledFight[] = [];
-  const roundCount = fighters.length - 1;
-  const matchesPerRound = fighters.length / 2;
+    return firstClub !== "" && firstClub === secondClub;
+  };
 
-  for (let roundIndex = 0; roundIndex < roundCount; roundIndex += 1) {
-    for (let matchIndex = 0; matchIndex < matchesPerRound; matchIndex += 1) {
-      const first = fighters[matchIndex];
-      const second = fighters[fighters.length - 1 - matchIndex];
+  const createSchedule = (order: number[]): Round[] => {
+    const rotation: Array<number | null> = [...order];
 
-      if (first && second) {
-        fights.push({
-          matchNumber: fights.length + 1,
-          roundNumber: roundIndex + 1,
-          first: getCompetitor(first),
-          second: getCompetitor(second),
-        });
+    if (rotation.length % 2 !== 0) {
+      rotation.push(null);
+    }
+
+    const rounds: Round[] = [];
+
+    for (let roundIndex = 0; roundIndex < rotation.length - 1; roundIndex += 1) {
+      const round: Round = [];
+
+      for (let pairIndex = 0; pairIndex < rotation.length / 2; pairIndex += 1) {
+        const first = rotation[pairIndex];
+        const second = rotation[rotation.length - 1 - pairIndex];
+
+        if (first !== null && second !== null) {
+          round.push({ first, second, sameClub: isSameClub(first, second) });
+        }
+      }
+
+      round.sort((first, second) =>
+        Number(second.sameClub) - Number(first.sameClub) ||
+        first.first - second.first ||
+        first.second - second.second
+      );
+      rounds.push(round);
+
+      const fixedParticipant = rotation[0];
+      const rotatingParticipants = rotation.slice(1);
+      rotatingParticipants.unshift(rotatingParticipants.pop() ?? null);
+      rotation.splice(0, rotation.length, fixedParticipant ?? null, ...rotatingParticipants);
+    }
+
+    return rounds;
+  };
+
+  const scoreSchedule = (rounds: Round[]) => rounds.map(
+    (round) => round.filter((pairing) => pairing.sameClub).length
+  );
+
+  const isBetterSchedule = (candidate: number[], current: number[]) => {
+    for (let index = 0; index < candidate.length; index += 1) {
+      if (candidate[index] !== current[index]) {
+        return candidate[index] > current[index];
       }
     }
 
-    const fixedFighter = fighters[0];
-    const rotatingFighters = fighters.slice(1);
-    rotatingFighters.unshift(rotatingFighters.pop() ?? null);
-    fighters.splice(0, fighters.length, fixedFighter ?? null, ...rotatingFighters);
+    return false;
+  };
+
+  const defaultOrder = participants.map((_, index) => index).sort((first, second) => {
+    const firstClub = participants[first].Verein.trim().toLocaleLowerCase("de-DE");
+    const secondClub = participants[second].Verein.trim().toLocaleLowerCase("de-DE");
+
+    return firstClub.localeCompare(secondClub, "de-DE") || first - second;
+  });
+  let bestRounds = createSchedule(defaultOrder);
+  let bestScore = scoreSchedule(bestRounds);
+
+  if (participants.length <= 8) {
+    const fixedParticipant = defaultOrder[0];
+    const remaining = defaultOrder.slice(1);
+
+    const searchOrders = (startIndex: number) => {
+      if (startIndex === remaining.length) {
+        const rounds = createSchedule([fixedParticipant, ...remaining]);
+        const score = scoreSchedule(rounds);
+
+        if (isBetterSchedule(score, bestScore)) {
+          bestRounds = rounds;
+          bestScore = score;
+        }
+
+        return;
+      }
+
+      for (let index = startIndex; index < remaining.length; index += 1) {
+        [remaining[startIndex], remaining[index]] =
+          [remaining[index], remaining[startIndex]];
+        searchOrders(startIndex + 1);
+        [remaining[startIndex], remaining[index]] =
+          [remaining[index], remaining[startIndex]];
+      }
+    };
+
+    searchOrders(0);
   }
 
-  return fights;
+  return bestRounds.flatMap((round, roundIndex) =>
+    round.map((pairing) => ({
+      matchNumber: 0,
+      roundNumber: roundIndex + 1,
+      first: getCompetitor(participants[pairing.first]),
+      second: getCompetitor(participants[pairing.second]),
+    }))
+  ).map((fight, index) => ({ ...fight, matchNumber: index + 1 }));
 }
 
 export function createKnockoutFights(

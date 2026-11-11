@@ -1,10 +1,16 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
+import type { Participant } from "../types/Participant";
+import {
+  getParticipantAgeClasses,
+  normalizeParticipant,
+  setParticipantAgeClasses,
+} from "../lib/participantStarts";
 
 interface Props {
-  participants: any[];
+  participants: Participant[];
   setParticipants: React.Dispatch<
-    React.SetStateAction<any[]>
+    React.SetStateAction<Participant[]>
   >;
 }
 
@@ -15,6 +21,24 @@ function ExcelUpload({
 
   const [search, setSearch] =
     useState("");
+
+  const getParticipantKey = (participant: Participant, index: number) =>
+    participant.id ?? `${participant.Vorname}-${participant.Nachname}-${participant.Jahrgang}-${index}`;
+
+  const ageClassChoices = [
+    { value: "", label: "Altersklasse wählen" },
+    ...Array.from(new Set([
+      "U11",
+      "U13",
+      "U15",
+      ...participants.flatMap(getParticipantAgeClasses),
+    ])).map((ageClass) => ({
+      value: ageClass,
+      label: ageClass,
+    })),
+    { value: "U11, U13", label: "Doppelstart: U11 + U13" },
+    { value: "U13, U15", label: "Doppelstart: U13 + U15" },
+  ];
 
   const handleFile = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -43,7 +67,17 @@ function ExcelUpload({
 
       setParticipants((prevParticipants) => [
         ...prevParticipants,
-        ...(jsonData as any[]),
+        ...(jsonData as Array<Record<string, unknown>>).map((row) =>
+          normalizeParticipant({
+            Vorname: String(row.Vorname ?? ""),
+            Nachname: String(row.Nachname ?? ""),
+            Jahrgang: Number(row.Jahrgang ?? 0),
+            Geschlecht: String(row.Geschlecht ?? ""),
+            Gewicht: Number(row.Gewicht ?? 0),
+            Altersklasse: String(row.Altersklasse ?? row.Altersklassen ?? ""),
+            Verein: String(row.Verein ?? ""),
+          })
+        ),
       ]);
 
       event.target.value = "";
@@ -52,7 +86,7 @@ function ExcelUpload({
     reader.readAsArrayBuffer(file);
   };
 
-  const deleteParticipant = (participantToDelete: any) => {
+  const deleteParticipant = (participantToDelete: Participant) => {
     setParticipants((prevParticipants) =>
       prevParticipants.filter(
         (participant) =>
@@ -70,16 +104,23 @@ function ExcelUpload({
         .includes(search.toLowerCase())
     );
 
-  const updateWeight = (
-    targetParticipant: any,
-    value: string
-  ) => {
+  const updateWeight = (targetParticipant: Participant, value: string) => {
+    if (value === "") {
+      return;
+    }
+
+    const weight = Number(value);
+
+    if (!Number.isFinite(weight)) {
+      return;
+    }
+
     setParticipants((prevParticipants) =>
       prevParticipants.map((participant) =>
         participant === targetParticipant
           ? {
               ...participant,
-              Gewicht: value,
+              Gewicht: weight,
             }
           : participant
       )
@@ -118,7 +159,7 @@ function ExcelUpload({
         Jahrgang: participant.Jahrgang ?? "",
         Geschlecht: participant.Geschlecht ?? "",
         Gewicht: participant.Gewicht ?? "",
-        Altersklasse: participant.Altersklasse ?? "",
+        Altersklasse: getParticipantAgeClasses(participant).join(", "),
         Verein: participant.Verein ?? "",
       }))
     );
@@ -168,7 +209,10 @@ function ExcelUpload({
       </button>
 
       <p>
-        Teilnehmer: {participants.length}
+        Teilnehmer: {participants.length} · Starts: {participants.reduce(
+          (total, participant) => total + getParticipantAgeClasses(participant).length,
+          0
+        )}
       </p>
 
       <input
@@ -188,16 +232,24 @@ function ExcelUpload({
             <th>Jahrgang</th>
             <th>Geschlecht</th>
             <th>Gewicht</th>
-            <th>Altersklasse</th>
+            <th>Starts / Altersklassen</th>
             <th>Verein</th>
             <th>Aktion</th>
           </tr>
         </thead>
 
         <tbody>
-          {filteredParticipants.map((participant, index) => (
+          {filteredParticipants.map((participant, index) => {
+            const participantKey = getParticipantKey(participant, index);
+            const ageClasses = getParticipantAgeClasses(participant);
+            const ageClassValue = ageClasses.join(", ");
+            const hasExistingChoice = !ageClassChoices.some(
+              (choice) => choice.value === ageClassValue
+            );
+
+            return (
             <tr
-              key={`${participant.Vorname}-${participant.Nachname}-${participant.Jahrgang}-${participant.Verein}-${index}`}
+              key={participantKey}
             >
               <td>{participant.Vorname}</td>
               <td>{participant.Nachname}</td>
@@ -217,7 +269,35 @@ function ExcelUpload({
                   }
                 />
               </td>
-              <td>{participant.Altersklasse}</td>
+              <td>
+                <select
+                  aria-label={`Altersklassen für ${participant.Vorname} ${participant.Nachname}`}
+                  value={ageClassValue}
+                  onChange={(event) =>
+                    setParticipants((prevParticipants) =>
+                      prevParticipants.map((currentParticipant) =>
+                        currentParticipant === participant
+                          ? setParticipantAgeClasses(
+                              currentParticipant,
+                              event.target.value
+                            )
+                          : currentParticipant
+                      )
+                    )
+                  }
+                >
+                  {hasExistingChoice && (
+                    <option value={ageClassValue}>
+                      {ageClasses.join(" + ")}
+                    </option>
+                  )}
+                  {ageClassChoices.map((choice) => (
+                    <option key={choice.value} value={choice.value}>
+                      {choice.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
               <td>{participant.Verein}</td>
               <td>
                 <button
@@ -229,7 +309,8 @@ function ExcelUpload({
                 </button>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

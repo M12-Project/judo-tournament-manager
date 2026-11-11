@@ -30,8 +30,37 @@ describe("createRoundRobinFights", () => {
       expect(fights).toHaveLength((size * (size - 1)) / 2);
       expect(new Set(pairings).size).toBe(pairings.length);
       expect(pairings).toHaveLength(new Set(pairings).size);
+
+      const roundNumbers = Array.from(
+        new Set(fights.map((fight) => fight.roundNumber))
+      );
+      expect(roundNumbers).toHaveLength(size % 2 === 0 ? size - 1 : size);
+
+      roundNumbers.forEach((roundNumber) => {
+        const participantsInRound = fights
+          .filter((fight) => fight.roundNumber === roundNumber)
+          .flatMap((fight) => [fight.first.label, fight.second.label]);
+
+        expect(new Set(participantsInRound).size).toBe(participantsInRound.length);
+      });
     }
   );
+
+  it("schedules same-club participants in the earliest available round", () => {
+    const participants = [
+      { ...makePool(1)[0], Vorname: "A", Verein: "Judo Club" },
+      { ...makePool(1)[0], Vorname: "B", Verein: "Judo Club" },
+      { ...makePool(1)[0], Vorname: "C", Verein: "Other Club" },
+      { ...makePool(1)[0], Vorname: "D", Verein: "Third Club" },
+    ];
+    const fights = createRoundRobinFights(participants);
+    const sameClubFight = fights.find(
+      (fight) => fight.first.participant?.Verein === fight.second.participant?.Verein
+    );
+
+    expect(sameClubFight?.roundNumber).toBe(1);
+    expect(sameClubFight?.matchNumber).toBe(1);
+  });
 
   it("creates a knockout bracket with automatic byes", () => {
     const fights = createKnockoutFights(makePool(5));

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPoolGroups } from "./poolLogic";
+import { expandParticipantsIntoStarts, normalizeParticipant } from "./participantStarts";
 import type { Participant } from "../types/Participant";
 
 const makeParticipant = (
@@ -58,5 +59,20 @@ describe("buildPoolGroups", () => {
     expect(groups["U15 - männlich"][0].map((fighter) => fighter.Gewicht)).toEqual([
       44, 46, 48, 52,
     ]);
+  });
+
+  it("puts a double-start participant into each age-class group exactly once", () => {
+    const doubleStarter = normalizeParticipant({
+      ...makeParticipant("A", 42),
+      Altersklasse: "U13, U15",
+    });
+    const groups = buildPoolGroups(
+      expandParticipantsIntoStarts([doubleStarter])
+    );
+
+    expect(groups["U13 - männlich"]).toHaveLength(1);
+    expect(groups["U15 - männlich"]).toHaveLength(1);
+    expect(groups["U13 - männlich"][0][0].id).toBe(doubleStarter.id);
+    expect(groups["U15 - männlich"][0][0].id).toBe(doubleStarter.id);
   });
 });
