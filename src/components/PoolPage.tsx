@@ -378,8 +378,8 @@ function PoolPage({
                           }))
                         }
                       >
-                        <option value="POOL">Jeder gegen jeden</option>
-                        <option value="KO">Doppel-KO-System</option>
+                        <option value="POOL">Jeder gegen Jeden</option>
+                        <option value="KO">KO-System</option>
                       </select>
                     </div>
 

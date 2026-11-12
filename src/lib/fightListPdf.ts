@@ -85,8 +85,8 @@ const getPoolTypeLabel = (poolType: PoolType | null, poolSize: number) => {
   }
 
   return poolType
-    ? `${poolType} - Jeder gegen jeden`
-    : `${poolSize} Teilnehmer - Jeder gegen jeden`;
+    ? `${poolType} - Jeder gegen Jeden`
+    : `${poolSize} Teilnehmer - Jeder gegen Jeden`;
 };
 
 const formatWeight = (weight: number) =>
@@ -497,19 +497,16 @@ const drawSheet = (
   if (showParticipantTable) {
     autoTable(pdf, {
       startY: 38,
-      head: [["Los", "Name", "Gewicht", "Verein"]],
+      head: [["Nr", "Name"]],
       body: participants.map((participant, index) => [
         String(index + 1),
         `${participant.Vorname} ${participant.Nachname}`,
-        `${participant.Gewicht} kg`,
-        participant.Verein,
       ]),
       theme: "grid",
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2 },
       headStyles: { fillColor: [34, 79, 74] },
       columnStyles: {
         0: { cellWidth: 12 },
-        2: { cellWidth: 22 },
       },
     });
   }

@@ -157,7 +157,7 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
               <div className="table-responsive">
                 <table className="table table-sm table-hover align-middle mb-0">
                   <thead>
-                    <tr><th>Los</th><th>Name</th><th>Gewicht</th><th>Verein</th></tr>
+                    <tr><th>Nr.</th><th>Name</th><th>Gewicht</th><th>Verein</th></tr>
                   </thead>
                   <tbody>
                     {participants.map((participant, index) => (

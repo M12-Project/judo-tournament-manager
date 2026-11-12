@@ -55,7 +55,7 @@ describe("createFightListPdf", () => {
     expect(pdfContent).not.toContain("Listenführer:");
   });
 
-  it("keeps the participant sheet compact without a placement column or event fields", async () => {
+  it("prints only number and name in the participant sheet", async () => {
     const pdf = await createFightListPdf(
       [{
         groupName: "U15 - weiblich",
@@ -67,8 +67,11 @@ describe("createFightListPdf", () => {
     );
     const pdfContent = pdf.output();
 
-    expect(pdfContent).toContain("Los");
-    expect(pdfContent).toContain("Gewicht");
+    expect(pdfContent).toContain("Nr");
+    expect(pdfContent).toContain("Name");
+    expect(pdfContent).not.toContain("Los");
+    expect(pdfContent).not.toContain("Gewicht");
+    expect(pdfContent).not.toContain("Verein");
     expect(pdfContent).not.toContain("Platz");
     expect(pdfContent).not.toContain("Datum:");
     expect(pdfContent).not.toContain("Listenführer:");
