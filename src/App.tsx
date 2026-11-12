@@ -30,8 +30,8 @@ function App() {
         <div className="container-xxl app-header-inner">
           <NavLink className="app-brand" to="/" end>
             <span>
-              <strong>Judo</strong>
-              <small>Wettkampfleitung</small>
+              <strong>Judo-Oberursel</strong>
+              <small>judo-tournament-manager</small>
             </span>
           </NavLink>
 
