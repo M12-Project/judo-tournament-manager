@@ -1,32 +1,27 @@
-# React + TypeScript + Vite
+🥋 Judo Tournament Manager
+A lightweight web application for organizing, managing, and tracking judo tournaments. The tool helps clubs, organizers, and referees efficiently manage participants, matches, brackets, and results through an intuitive interface.
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+---
 
-Currently, two official plugins are available:
+🧩 Overview
+The Judo Tournament Manager simplifies tournament organization by providing a central platform for registration, match scheduling, score tracking, and result management. It is designed for small and medium-sized tournaments while remaining easy to use and deploy.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+⭐ Features
+Athlete registration and management
+Weight class and category organization
+Automatic tournament bracket generation
+Match scheduling and tracking
+Live score and result management
+Tournament standings and winner determination
+Responsive and user-friendly interface
+Lightweight and easy deployment
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+🚀 Installation
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+```bash
+https://github.com/M12-Project/judo-tournament-manager.git
+cd judo-tournament-manager
