@@ -8,4 +8,6 @@ export interface Participant {
   Altersklasse: string;
   Altersklassen?: string[];
   Verein: string;
+  Anwesend?: boolean;
+  Bezahlt?: boolean;
 }

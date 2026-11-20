@@ -117,6 +117,28 @@ select {
   padding-bottom: 4rem;
 }
 
+.container-xxl.app-header-inner,
+.container-xxl.app-main {
+  width: calc(100% - 2rem);
+  max-width: none;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media (min-width: 768px) {
+  .container-xxl.app-header-inner,
+  .container-xxl.app-main {
+    width: calc(100% - 4rem);
+  }
+}
+
+@media (min-width: 1400px) {
+  .container-xxl.app-header-inner,
+  .container-xxl.app-main {
+    width: calc(100% - 12.5rem);
+  }
+}
+
 .page-heading {
   display: flex;
   align-items: flex-end;
@@ -193,11 +215,16 @@ select {
 }
 
 .weight-input {
-  min-width: 7rem;
+  width: 8.5rem;
+  min-width: 0;
+  margin-inline: auto;
 }
 
 .age-class-select {
-  min-width: 11rem;
+  width: 8.5rem;
+  min-width: 8.5rem;
+  max-width: 8.5rem;
+  margin-inline: auto;
 }
 
 .pool-system-select {
@@ -223,6 +250,110 @@ select {
 
 .table > :not(caption) > * > * {
   padding: 0.72rem 0.8rem;
+}
+
+.participant-table > :not(caption) > * > * {
+  padding-right: 0.3rem;
+  padding-left: 0.3rem;
+}
+
+.participant-table {
+  font-size: 0.9rem;
+}
+
+.participant-table thead th {
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #dfe8e2;
+  background: #edf3ef;
+  color: #53665c;
+}
+
+.participant-table tbody td {
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  border-bottom-color: #e8eeea;
+}
+
+.participant-table tbody tr:nth-child(even) > * {
+  background-color: #fbfcfb;
+}
+
+.participant-table tbody tr:hover > * {
+  background-color: #f0f6f2;
+}
+
+.participant-table tbody tr.participant-row-absent > * {
+  background-color: #e4e9e6;
+  color: #748078;
+}
+
+.participant-table tbody tr.participant-row-absent:hover > * {
+  background-color: #dce3de;
+}
+
+.participant-table tbody tr.participant-row-absent .form-control,
+.participant-table tbody tr.participant-row-absent .form-select,
+.participant-table tbody tr.participant-row-absent .input-group-text {
+  border-color: #d2dbd5;
+  background-color: #e9edea;
+  color: #748078;
+}
+
+.participant-name-cell {
+  min-width: 10rem;
+  color: var(--judo-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.participant-club-cell {
+  max-width: 9rem;
+  color: var(--judo-muted);
+  overflow-wrap: anywhere;
+}
+
+.participant-age-check {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  max-width: 8rem;
+  margin-inline: auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.participant-age-check small {
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.participant-age-check.is-valid {
+  color: #23734b;
+}
+
+.participant-age-check.is-warning {
+  color: #a63d30;
+}
+
+.participant-status-switch {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  min-height: 1.4rem;
+  margin: 0;
+  padding-left: 0;
+}
+
+.participant-status-switch .form-check-input {
+  float: none;
+  width: 2.15rem;
+  height: 1.15rem;
+  margin: 0;
+  cursor: pointer;
 }
 
 .table thead th {
@@ -441,5 +572,10 @@ select {
 
   .table > :not(caption) > * > * {
     padding: 0.6rem;
+  }
+
+  .participant-table > :not(caption) > * > * {
+    padding-right: 0.45rem;
+    padding-left: 0.45rem;
   }
 }

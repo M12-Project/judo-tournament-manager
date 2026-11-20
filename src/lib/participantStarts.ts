@@ -26,6 +26,8 @@ export function normalizeParticipant(
     id: participant.id || createParticipantId(),
     Altersklasse: ageClasses[0] ?? "",
     Altersklassen: ageClasses,
+    Anwesend: participant.Anwesend ?? true,
+    Bezahlt: participant.Anwesend === false ? false : participant.Bezahlt ?? false,
   };
 }
 
@@ -58,4 +60,85 @@ export function expandParticipantsIntoStarts(participants: Participant[]) {
       Altersklassen: [ageClass],
     }))
   );
+}
+
+export function getPresentParticipants(participants: Participant[]) {
+  return participants.filter((participant) => participant.Anwesend !== false);
+}
+
+const ageClassAgeRanges: Record<string, { min: number; max: number }> = {
+  U11: { min: 8, max: 10 },
+  U13: { min: 11, max: 12 },
+  U15: { min: 13, max: 14 },
+};
+const ageClassOrder = ["U11", "U13", "U15"];
+
+export function getAgeClassWarnings(
+  participant: Participant,
+  competitionYear: number
+) {
+  const birthYear = Number(participant.Jahrgang);
+  const age = competitionYear - birthYear;
+
+  if (
+    !Number.isInteger(competitionYear) ||
+    !Number.isInteger(birthYear) ||
+    birthYear <= 0 ||
+    age < 0
+  ) {
+    return ["Jahrgang oder Wettkampfjahr ist ungültig."];
+  }
+
+  const ageClasses = getParticipantAgeClasses(participant);
+
+  if (ageClasses.length === 0) {
+    return ["Keine Altersklasse ausgewählt."];
+  }
+
+  const matchingAgeClass = ageClassOrder.find((ageClass) => {
+    const range = ageClassAgeRanges[ageClass];
+    return age >= range.min && age <= range.max;
+  });
+
+  if (!matchingAgeClass) {
+    return [
+      `Im Wettkampfjahr ${competitionYear} ist die Person ${age} Jahre alt und passt zu keiner unterstützten Altersklasse.`,
+    ];
+  }
+
+  const matchingClassIndex = ageClassOrder.indexOf(matchingAgeClass);
+  const warnings = ageClasses.flatMap((ageClass) => {
+    const normalizedAgeClass = ageClass.toUpperCase();
+    const classIndex = ageClassOrder.indexOf(normalizedAgeClass);
+
+    if (classIndex < 0) {
+      return [`Altersklasse ${ageClass} kann nicht geprüft werden.`];
+    }
+
+    if (classIndex < matchingClassIndex) {
+      return [
+        `Ein Start nach unten in ${ageClass} ist nicht erlaubt. Die passende Altersklasse ist ${matchingAgeClass}.`,
+      ];
+    }
+
+    if (classIndex > matchingClassIndex + 1) {
+      return [
+        `Ein Doppelstart ist nur in die direkt höhere Altersklasse ${ageClassOrder[matchingClassIndex + 1] ?? ""} erlaubt.`,
+      ];
+    }
+
+    return [];
+  });
+
+  if (!ageClasses.some((ageClass) => ageClass.toUpperCase() === matchingAgeClass)) {
+    warnings.unshift(
+      `Die passende Altersklasse ${matchingAgeClass} muss ausgewählt sein. Ein Doppelstart ist nur zusätzlich in der direkt höheren Klasse erlaubt.`
+    );
+  }
+
+  if (ageClasses.length > 2) {
+    warnings.push("Es sind höchstens zwei Starts als Doppelstart erlaubt.");
+  }
+
+  return warnings;
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import * as XLSX from "xlsx";
 import type { Participant } from "../types/Participant";
 import {
+  getAgeClassWarnings,
   getParticipantAgeClasses,
   normalizeParticipant,
   setParticipantAgeClasses,
@@ -13,6 +14,17 @@ interface Props {
     React.SetStateAction<Participant[]>
   >;
 }
+
+const parseBooleanCell = (value: unknown, fallback: boolean) => {
+  if (typeof value === "boolean") return value;
+
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["true", "1", "ja", "yes"].includes(normalized)) return true;
+  if (["false", "0", "nein", "no"].includes(normalized)) return false;
+  return fallback;
+};
+
+const currentYear = new Date().getFullYear();
 
 function ExcelUpload({
   participants,
@@ -76,6 +88,8 @@ function ExcelUpload({
             Gewicht: Number(row.Gewicht ?? 0),
             Altersklasse: String(row.Altersklasse ?? row.Altersklassen ?? ""),
             Verein: String(row.Verein ?? ""),
+            Anwesend: parseBooleanCell(row.Anwesend, true),
+            Bezahlt: parseBooleanCell(row.Bezahlt, false),
           })
         ),
       ]);
@@ -95,14 +109,12 @@ function ExcelUpload({
     );
   };
 
-  const filteredParticipants =
-    participants.filter((participant) =>
-      `${participant.Vorname ?? ""} ${
-        participant.Nachname ?? ""
-      }`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredParticipants = participants.filter((participant) =>
+    [participant.Vorname, participant.Nachname, participant.Verein].some(
+      (value) => String(value ?? "").toLowerCase().includes(normalizedSearch)
+    )
+  );
 
   const updateWeight = (targetParticipant: Participant, value: string) => {
     if (value === "") {
@@ -127,6 +139,24 @@ function ExcelUpload({
     );
   };
 
+  const updateParticipantStatus = (
+    targetParticipant: Participant,
+    field: "Anwesend" | "Bezahlt",
+    value: boolean
+  ) => {
+    setParticipants((prevParticipants) =>
+      prevParticipants.map((participant) =>
+        participant === targetParticipant
+          ? field === "Anwesend"
+            ? { ...participant, Anwesend: value, ...(value ? {} : { Bezahlt: false }) }
+            : participant.Anwesend === false
+              ? participant
+              : { ...participant, Bezahlt: value }
+          : participant
+      )
+    );
+  };
+
   const exportToExcel = () => {
     if (participants.length === 0) {
       return;
@@ -141,6 +171,8 @@ function ExcelUpload({
         Gewicht: participant.Gewicht ?? "",
         Altersklasse: getParticipantAgeClasses(participant).join(", "),
         Verein: participant.Verein ?? "",
+        Anwesend: participant.Anwesend !== false,
+        Bezahlt: participant.Bezahlt === true,
       }))
     );
 
@@ -192,6 +224,12 @@ function ExcelUpload({
           <div className="d-flex flex-wrap gap-2">
             <span className="stat-chip">{participants.length} Teilnehmer</span>
             <span className="stat-chip">
+              {participants.filter((participant) => participant.Anwesend !== false).length} anwesend
+            </span>
+            <span className="stat-chip">
+              {participants.filter((participant) => participant.Bezahlt === true).length} bezahlt
+            </span>
+            <span className="stat-chip">
               {participants.reduce(
                 (total, participant) => total + getParticipantAgeClasses(participant).length,
                 0
@@ -202,8 +240,8 @@ function ExcelUpload({
             <input
               className="form-control"
               type="search"
-              placeholder="Name suchen ..."
-              aria-label="Teilnehmer suchen"
+              placeholder="Name oder Verein suchen ..."
+              aria-label="Teilnehmer oder Verein suchen"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -217,16 +255,18 @@ function ExcelUpload({
           </div>
         ) : (
           <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
+            <table className="table table-hover align-middle participant-table mb-0">
               <thead>
                 <tr>
-                  <th>Vorname</th>
-                  <th>Nachname</th>
+                  <th>Teilnehmer</th>
                   <th>Jahrgang</th>
                   <th>Geschlecht</th>
-                  <th>Gewicht</th>
-                  <th>Starts</th>
+                  <th className="text-center">Gewicht</th>
+                  <th className="text-center">Starts</th>
+                  <th className="participant-age-column text-center">Altersprüfung</th>
                   <th>Verein</th>
+                  <th className="text-center">Anwesend</th>
+                  <th className="text-center">Bezahlt</th>
                   <th className="text-end">Aktion</th>
                 </tr>
               </thead>
@@ -235,17 +275,25 @@ function ExcelUpload({
                   const participantKey = getParticipantKey(participant, index);
                   const ageClasses = getParticipantAgeClasses(participant);
                   const ageClassValue = ageClasses.join(", ");
+                  const ageWarnings = getAgeClassWarnings(
+                    participant,
+                    currentYear
+                  );
                   const hasExistingChoice = !ageClassChoices.some(
                     (choice) => choice.value === ageClassValue
                   );
 
                   return (
-                    <tr key={participantKey}>
-                      <td className="fw-semibold">{participant.Vorname}</td>
-                      <td className="fw-semibold">{participant.Nachname}</td>
+                    <tr
+                      key={participantKey}
+                      className={participant.Anwesend === false ? "participant-row-absent" : ""}
+                    >
+                      <td className="participant-name-cell">
+                        {participant.Vorname} {participant.Nachname}
+                      </td>
                       <td>{participant.Jahrgang}</td>
                       <td>{participant.Geschlecht}</td>
-                      <td>
+                      <td className="text-center">
                         <div className="input-group input-group-sm weight-input">
                           <input
                             className="form-control"
@@ -259,7 +307,7 @@ function ExcelUpload({
                           <span className="input-group-text">kg</span>
                         </div>
                       </td>
-                      <td>
+                      <td className="text-center">
                         <select
                           className="form-select form-select-sm age-class-select"
                           aria-label={`Altersklassen für ${participant.Vorname} ${participant.Nachname}`}
@@ -282,7 +330,41 @@ function ExcelUpload({
                           ))}
                         </select>
                       </td>
-                      <td>{participant.Verein}</td>
+                      <td className="participant-age-column text-center">
+                        <div className={`participant-age-check${ageWarnings.length > 0 ? " is-warning" : " is-valid"}`} role="status">
+                          <span>{ageWarnings.length > 0 ? "Warnung" : "Passt"}</span>
+                          {ageWarnings.length > 0 && <small>{ageWarnings.join(" ")}</small>}
+                        </div>
+                      </td>
+                      <td className="participant-club-cell">{participant.Verein}</td>
+                      <td className="text-center">
+                        <div className="form-check form-switch participant-status-switch">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            aria-label={`Anwesenheit für ${participant.Vorname} ${participant.Nachname}`}
+                            checked={participant.Anwesend !== false}
+                            onChange={(event) =>
+                              updateParticipantStatus(participant, "Anwesend", event.target.checked)
+                            }
+                          />
+                        </div>
+                      </td>
+                      <td className="text-center">
+                        <div className="form-check form-switch participant-status-switch">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            aria-label={`Bezahlt für ${participant.Vorname} ${participant.Nachname}`}
+                            title={participant.Anwesend === false ? "Abwesende Teilnehmer können nicht bezahlt werden" : undefined}
+                            checked={participant.Bezahlt === true}
+                            disabled={participant.Anwesend === false}
+                            onChange={(event) =>
+                              updateParticipantStatus(participant, "Bezahlt", event.target.checked)
+                            }
+                          />
+                        </div>
+                      </td>
                       <td className="text-end">
                         <button
                           className="btn btn-sm btn-outline-danger"

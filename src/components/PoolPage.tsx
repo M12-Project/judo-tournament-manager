@@ -4,7 +4,10 @@ import {
   buildPoolGroups,
   groupParticipantsByCategory,
 } from "../lib/poolLogic";
-import { expandParticipantsIntoStarts } from "../lib/participantStarts";
+import {
+  expandParticipantsIntoStarts,
+  getPresentParticipants,
+} from "../lib/participantStarts";
 import { matchesGroupSearch } from "../lib/groupSearch";
 
 interface Props {
@@ -150,7 +153,7 @@ function PoolPage({
 
   const groupedParticipants = useMemo(
     () => groupParticipantsByCategory(
-      expandParticipantsIntoStarts(participants)
+      expandParticipantsIntoStarts(getPresentParticipants(participants))
     ),
     [participants]
   );
@@ -161,10 +164,13 @@ function PoolPage({
 
   const suggestedGroups = useMemo(
     () =>
-      buildPoolGroups(expandParticipantsIntoStarts(participants), {
+      buildPoolGroups(
+        expandParticipantsIntoStarts(getPresentParticipants(participants)),
+        {
         maxPoolSize,
         maxWeightSpan,
-      }),
+        }
+      ),
     [participants, maxPoolSize, maxWeightSpan]
   );
 
