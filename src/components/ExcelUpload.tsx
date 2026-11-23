@@ -247,9 +247,7 @@ function ExcelUpload({
         );
         const result = applyWeighListUpdates(participants, rows);
         setParticipants(result.participants);
-        setWeighListImportMessage(
-          `${result.updated} Gewichte aktualisiert. ${result.notFound} Teilnehmer-IDs nicht gefunden, ${result.invalid} ungültige Gewichte ignoriert. Es wurden keine Teilnehmer hinzugefügt.`
-        );
+        setWeighListImportMessage(`${result.updated} Gewichte aktualisiert.`);
       } catch {
         setWeighListImportMessage("Die Wiegeliste konnte nicht gelesen werden.");
       } finally {
