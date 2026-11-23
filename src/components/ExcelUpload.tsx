@@ -7,6 +7,10 @@ import {
   normalizeParticipant,
   setParticipantAgeClasses,
 } from "../lib/participantStarts";
+import {
+  applyWeighListUpdates,
+  getWeighListParticipants,
+} from "../lib/weighLists";
 
 interface Props {
   participants: Participant[];
@@ -33,6 +37,8 @@ function ExcelUpload({
 
   const [search, setSearch] =
     useState("");
+  const [weighListCategory, setWeighListCategory] = useState("U11|männlich");
+  const [weighListImportMessage, setWeighListImportMessage] = useState("");
 
   const getParticipantKey = (participant: Participant, index: number) =>
     participant.id ?? `${participant.Vorname}-${participant.Nachname}-${participant.Jahrgang}-${index}`;
@@ -186,6 +192,74 @@ function ExcelUpload({
     XLSX.writeFile(workbook, "teilnehmer.xlsx");
   };
 
+  const exportWeighList = () => {
+    const [ageClass, gender] = weighListCategory.split("|");
+    const weighListParticipants = getWeighListParticipants(
+      participants,
+      ageClass,
+      gender
+    );
+
+    if (weighListParticipants.length === 0) {
+      setWeighListImportMessage(`Keine anwesenden Teilnehmer für ${ageClass} - ${gender} gefunden.`);
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(
+      weighListParticipants.map((participant) => ({
+        "Teilnehmer-ID": participant.id ?? "",
+        Vorname: participant.Vorname,
+        Nachname: participant.Nachname,
+        Jahrgang: participant.Jahrgang,
+        Geschlecht: participant.Geschlecht,
+        Altersklasse: ageClass,
+        Gewicht: participant.Gewicht,
+        Verein: participant.Verein,
+      }))
+    );
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Wiegeliste");
+
+    const genderPart = gender === "männlich" ? "maennlich" : "weiblich";
+    XLSX.writeFile(workbook, `wiegeliste-${ageClass.toLowerCase()}-${genderPart}.xlsx`);
+    setWeighListImportMessage("");
+  };
+
+  const handleWeighListReturn = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (loadEvent) => {
+      try {
+        const workbook = XLSX.read(loadEvent.target?.result, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) {
+          setWeighListImportMessage("Die Datei enthält kein Tabellenblatt.");
+          return;
+        }
+
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+          workbook.Sheets[sheetName],
+          { defval: "" }
+        );
+        const result = applyWeighListUpdates(participants, rows);
+        setParticipants(result.participants);
+        setWeighListImportMessage(
+          `${result.updated} Gewichte aktualisiert. ${result.notFound} Teilnehmer-IDs nicht gefunden, ${result.invalid} ungültige Gewichte ignoriert. Es wurden keine Teilnehmer hinzugefügt.`
+        );
+      } catch {
+        setWeighListImportMessage("Die Wiegeliste konnte nicht gelesen werden.");
+      } finally {
+        event.target.value = "";
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
   return (
     <section className="workspace-panel">
       <div className="workspace-panel-header flex-wrap">
@@ -220,6 +294,43 @@ function ExcelUpload({
       </div>
 
       <div className="workspace-panel-body">
+        <div className="weigh-list-tools">
+          <label className="weigh-list-category">
+            <span>Separate Wiegeliste</span>
+            <select
+              className="form-select"
+              aria-label="Wiegelisten-Kategorie"
+              value={weighListCategory}
+              onChange={(event) => setWeighListCategory(event.target.value)}
+            >
+              {["U11", "U13", "U15"].flatMap((ageClass) =>
+                ["männlich", "weiblich"].map((gender) => (
+                  <option key={`${ageClass}|${gender}`} value={`${ageClass}|${gender}`}>
+                    {ageClass} - {gender}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+          <button className="btn btn-outline-primary" onClick={exportWeighList}>
+            Wiegeliste exportieren
+          </button>
+          <label className="btn btn-outline-secondary mb-0">
+            Rücklauf importieren
+            <input
+              className="visually-hidden"
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleWeighListReturn}
+            />
+          </label>
+        </div>
+        {weighListImportMessage && (
+          <p className="weigh-list-import-message" role="status">
+            {weighListImportMessage}
+          </p>
+        )}
+
         <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
           <div className="d-flex flex-wrap gap-2">
             <span className="stat-chip">{participants.length} Teilnehmer</span>
