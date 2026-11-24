@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { Participant } from "../types/Participant";
 import {
   buildPoolGroups,
+  getDjb2026WeightClass,
   groupParticipantsByCategory,
+  groupParticipantsByDjb2026WeightClass,
+  isDjb2026FixedWeightClassGroup,
 } from "../lib/poolLogic";
 import {
   expandParticipantsIntoStarts,
@@ -29,7 +32,16 @@ interface Props {
       Record<string, Participant[][]>
     >
   >;
+  djbPoolSystems: Record<string, "POOL" | "KO">;
+  setDjbPoolSystems: React.Dispatch<
+    React.SetStateAction<Record<string, "POOL" | "KO">>
+  >;
+  setDjbGeneratedPools: React.Dispatch<
+    React.SetStateAction<Record<string, Participant[][]>>
+  >;
 }
+
+type AssignmentMode = "free" | "djb2026";
 
 const buildParticipantKey = (
   participant: Participant
@@ -125,7 +137,11 @@ function PoolPage({
   poolSystems,
   setPoolSystems,
   setGeneratedPools,
+  djbPoolSystems,
+  setDjbPoolSystems,
+  setDjbGeneratedPools,
 }: Props) {
+  const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>("free");
   const [maxPoolSize, setMaxPoolSize] = useState(4);
   const [maxWeightSpan, setMaxWeightSpan] = useState(6);
   const [groupSearch, setGroupSearch] = useState("");
@@ -144,18 +160,25 @@ function PoolPage({
 
     setter(parsed);
   };
-  const [manualPoolAssignments, setManualPoolAssignments] = useState<
-    Record<string, number>
-  >({});
-  const [additionalPoolCounts, setAdditionalPoolCounts] = useState<
-    Record<string, number>
-  >({});
+  const [manualPoolAssignmentsByMode, setManualPoolAssignmentsByMode] = useState<
+    Record<AssignmentMode, Record<string, number>>
+  >({ free: {}, djb2026: {} });
+  const [additionalPoolCountsByMode, setAdditionalPoolCountsByMode] = useState<
+    Record<AssignmentMode, Record<string, number>>
+  >({ free: {}, djb2026: {} });
+  const manualPoolAssignments = manualPoolAssignmentsByMode[assignmentMode];
+  const additionalPoolCounts = additionalPoolCountsByMode[assignmentMode];
+  const activePoolSystems = assignmentMode === "free" ? poolSystems : djbPoolSystems;
+  const setActivePoolSystems = assignmentMode === "free" ? setPoolSystems : setDjbPoolSystems;
 
   const groupedParticipants = useMemo(
-    () => groupParticipantsByCategory(
-      expandParticipantsIntoStarts(getPresentParticipants(participants))
-    ),
-    [participants]
+    () => {
+      const starts = expandParticipantsIntoStarts(getPresentParticipants(participants));
+      return assignmentMode === "djb2026"
+        ? groupParticipantsByDjb2026WeightClass(starts)
+        : groupParticipantsByCategory(starts);
+    },
+    [participants, assignmentMode]
   );
 
   const filteredGroups = Object.entries(groupedParticipants).filter(
@@ -169,9 +192,10 @@ function PoolPage({
         {
         maxPoolSize,
         maxWeightSpan,
+        useDjb2026WeightClasses: assignmentMode === "djb2026",
         }
       ),
-    [participants, maxPoolSize, maxWeightSpan]
+    [participants, maxPoolSize, maxWeightSpan, assignmentMode]
   );
 
   const getSelectablePoolCount = (groupName: string) => {
@@ -197,13 +221,6 @@ function PoolPage({
     );
   };
 
-  const addPoolToGroup = (groupName: string) => {
-    setAdditionalPoolCounts((counts) => ({
-      ...counts,
-      [groupName]: (counts[groupName] ?? 0) + 1,
-    }));
-  };
-
   const handleManualPoolChange = (
     groupName: string,
     participant: Participant,
@@ -211,9 +228,12 @@ function PoolPage({
   ) => {
     const key = `${groupName}|${buildParticipantKey(participant)}`;
 
-    setManualPoolAssignments((prev) => ({
+    setManualPoolAssignmentsByMode((prev) => ({
       ...prev,
-      [key]: targetPoolIndex,
+      [assignmentMode]: {
+        ...prev[assignmentMode],
+        [key]: targetPoolIndex,
+      },
     }));
   };
 
@@ -221,9 +241,16 @@ function PoolPage({
     groupName: string,
     poolIndex: number
   ) => {
+    if (
+      assignmentMode === "djb2026" &&
+      isDjb2026FixedWeightClassGroup(groupName)
+    ) {
+      return "KO";
+    }
+
     const key = `${groupName}-${poolIndex}`;
 
-    return poolSystems[key] ?? "POOL";
+    return activePoolSystems[key] ?? "POOL";
   };
 
   const finalizedPools = useMemo(
@@ -245,12 +272,12 @@ function PoolPage({
   );
 
   useEffect(() => {
-    setGeneratedPools((currentPools) =>
-      JSON.stringify(currentPools) === JSON.stringify(finalizedPools)
-        ? currentPools
-        : finalizedPools
-    );
-  }, [finalizedPools, setGeneratedPools]);
+      (assignmentMode === "free" ? setGeneratedPools : setDjbGeneratedPools)((currentPools) =>
+        JSON.stringify(currentPools) === JSON.stringify(finalizedPools)
+          ? currentPools
+          : finalizedPools
+      );
+  }, [assignmentMode, finalizedPools, setDjbGeneratedPools, setGeneratedPools]);
 
   return (
     <div className="pool-page">
@@ -263,6 +290,25 @@ function PoolPage({
         <span className="stat-chip">
           {Object.keys(groupedParticipants).length} Gruppen
         </span>
+      </div>
+
+      <div className="btn-group mb-4" role="group" aria-label="Einteilungsmodus">
+        <button
+          type="button"
+          className={`btn ${assignmentMode === "free" ? "btn-primary" : "btn-outline-primary"}`}
+          aria-pressed={assignmentMode === "free"}
+          onClick={() => setAssignmentMode("free")}
+        >
+          Freie Pools
+        </button>
+        <button
+          type="button"
+          className={`btn ${assignmentMode === "djb2026" ? "btn-primary" : "btn-outline-primary"}`}
+          aria-pressed={assignmentMode === "djb2026"}
+          onClick={() => setAssignmentMode("djb2026")}
+        >
+          DJB-Gewichtsklassen 2026
+        </button>
       </div>
 
       <div className="group-search-row">
@@ -285,10 +331,10 @@ function PoolPage({
       <section className="workspace-panel mb-4">
         <div className="workspace-panel-header">
           <div>
-            <h2>Vorschlagsregeln</h2>
-            <div className="small text-secondary mt-1">Gewichtsabstand und Poolgröße für die automatische Einteilung</div>
+            <h2>{assignmentMode === "free" ? "Freie Poolregeln" : "DJB 2026: feste Gewichtsklassen"}</h2>
+            <div className="small text-secondary mt-1">{assignmentMode === "free" ? "Gewichtsabstand und Poolgröße für die automatische Einteilung" : "Feste Klassen bleiben zusammen und starten direkt im KO-System. U11 wird mangels Gewichtsklassen frei gepoolt."}</div>
           </div>
-          <span className="badge text-bg-light border">Manuell anpassbar</span>
+          <span className="badge text-bg-light border">{assignmentMode === "free" ? "Manuell anpassbar" : "DJB-Klassen fest · direkt KO"}</span>
         </div>
         <div className="workspace-panel-body">
           <div className="row g-3">
@@ -339,6 +385,9 @@ function PoolPage({
         </div>
       ) : filteredGroups.map(
         ([groupName, fighters]) => {
+          const fixedDjbWeightClass =
+            assignmentMode === "djb2026" &&
+            isDjb2026FixedWeightClassGroup(groupName);
           const pools = getVisiblePoolsForGroup(
             groupName,
             groupedParticipants,
@@ -357,41 +406,62 @@ function PoolPage({
                     {fighters.length} Teilnehmer
                   </span>
                 </h2>
-                <button
-                  className="btn btn-sm btn-outline-primary"
-                  type="button"
-                  onClick={() => addPoolToGroup(groupName)}
-                >
-                  <span aria-hidden="true">+</span> Pool hinzufügen
-                </button>
+                {!fixedDjbWeightClass && (
+                  <button
+                    className="btn btn-sm btn-outline-primary"
+                    type="button"
+                    onClick={() => setAdditionalPoolCountsByMode((counts) => ({
+                      ...counts,
+                      [assignmentMode]: {
+                        ...counts[assignmentMode],
+                        [groupName]: (counts[assignmentMode][groupName] ?? 0) + 1,
+                      },
+                    }))}
+                  >
+                    <span aria-hidden="true">+</span> Pool hinzufügen
+                  </button>
+                )}
               </div>
+              {fixedDjbWeightClass && fighters.length > 32 && (
+                <div className="alert alert-warning" role="alert">
+                  Diese Gewichtsklasse hat {fighters.length} Teilnehmende. Bitte prüfen: vorgesehen sind maximal 32.
+                </div>
+              )}
               {pools.map((pool, poolIndex) => {
                 return (
                   <article key={`${groupName}-pool-${poolIndex}`} className="pool-block mb-3">
                     <div className="pool-block-header">
                       <div className="pool-block-title">
-                        <span className="badge text-bg-primary">Pool {String.fromCharCode(65 + poolIndex)}</span>
+                        <span className="badge text-bg-primary">
+                          {fixedDjbWeightClass ? "DJB-KO" : `Pool ${String.fromCharCode(65 + poolIndex)}`}
+                        </span>
                         <span>{pool.length} Kämpfer</span>
                       </div>
-                      <select
-                        className="form-select form-select-sm pool-system-select"
-                        aria-label={`Kampfsystem ${groupName} Pool ${poolIndex + 1}`}
-                        value={getPoolSystem(groupName, poolIndex)}
-                        onChange={(event) =>
-                          setPoolSystems((prev) => ({
-                            ...prev,
-                            [`${groupName}-${poolIndex}`]: event.target.value as "POOL" | "KO",
-                          }))
-                        }
-                      >
-                        <option value="POOL">Jeder gegen Jeden</option>
-                        <option value="KO">KO-System</option>
-                      </select>
-                    </div>
+                      {fixedDjbWeightClass ? (
+                        <span className="badge text-bg-success">Doppel-KO-System</span>
+                      ) : (
+                        <select
+                          className="form-select form-select-sm pool-system-select"
+                          aria-label={`Kampfsystem ${groupName} Pool ${poolIndex + 1}`}
+                          value={getPoolSystem(groupName, poolIndex)}
+                          onChange={(event) =>
+                            setActivePoolSystems((prev) => ({
+                              ...prev,
+                              [`${groupName}-${poolIndex}`]: event.target.value as "POOL" | "KO",
+                            }))
+                          }
+                        >
+                          <option value="POOL">Jeder gegen Jeden</option>
+                          <option value="KO">KO-System</option>
+                        </select>
+                      )}
+              </div>
 
                     {pool.length === 0 ? (
                       <div className="empty-pool-state">
-                        Pool ist leer. Wähle diesen Pool bei einem Teilnehmer aus, um ihn hierhin zu verschieben.
+                        {fixedDjbWeightClass
+                          ? "Keine Teilnehmenden in dieser festen Gewichtsklasse."
+                          : "Pool ist leer. Wähle diesen Pool bei einem Teilnehmer aus, um ihn hierhin zu verschieben."}
                       </div>
                     ) : pool.map((fighter) => (
                       <div
@@ -401,33 +471,44 @@ function PoolPage({
                         <div className="fighter-name">
                           {fighter.Vorname} {fighter.Nachname}
                           <span className="fighter-meta">{fighter.Verein} · {formatWeight(fighter.Gewicht)} kg</span>
+                          {assignmentMode === "djb2026" && (
+                            <span className="badge text-bg-light border mt-1">
+                              {getDjb2026WeightClass(
+                                fighter.Altersklasse,
+                                fighter.Geschlecht,
+                                Number(fighter.Gewicht)
+                              ) ?? "Keine feste Gewichtsklasse"}
+                            </span>
+                          )}
                         </div>
-                        <div className="d-flex align-items-center gap-2">
-                          <label className="small text-secondary" htmlFor={`assignment-${poolIndex}-${buildParticipantKey(fighter)}`}>Pool</label>
-                          <select
-                            id={`assignment-${poolIndex}-${buildParticipantKey(fighter)}`}
-                            className="form-select form-select-sm assignment-select"
-                            value={String(
-                              getPoolIndexForParticipant(
-                                groupName,
-                                fighter,
-                                manualPoolAssignments,
-                                suggestedGroups
-                              )
-                            )}
-                            onChange={(event) =>
-                              handleManualPoolChange(
-                                groupName,
-                                fighter,
-                                Number(event.target.value)
-                              )
-                            }
-                          >
-                            {Array.from({ length: selectablePoolCount }, (_, index) => (
-                              <option key={index} value={String(index)}>{String.fromCharCode(65 + index)}</option>
-                            ))}
-                          </select>
-                        </div>
+                        {!fixedDjbWeightClass && (
+                          <div className="d-flex align-items-center gap-2">
+                            <label className="small text-secondary" htmlFor={`assignment-${poolIndex}-${buildParticipantKey(fighter)}`}>Pool</label>
+                            <select
+                              id={`assignment-${poolIndex}-${buildParticipantKey(fighter)}`}
+                              className="form-select form-select-sm assignment-select"
+                              value={String(
+                                getPoolIndexForParticipant(
+                                  groupName,
+                                  fighter,
+                                  manualPoolAssignments,
+                                  suggestedGroups
+                                )
+                              )}
+                              onChange={(event) =>
+                                handleManualPoolChange(
+                                  groupName,
+                                  fighter,
+                                  Number(event.target.value)
+                                )
+                              }
+                            >
+                              {Array.from({ length: selectablePoolCount }, (_, index) => (
+                                <option key={index} value={String(index)}>{String.fromCharCode(65 + index)}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </article>

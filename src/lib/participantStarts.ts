@@ -68,8 +68,8 @@ export function getPresentParticipants(participants: Participant[]) {
 
 const ageClassAgeRanges: Record<string, { min: number; max: number }> = {
   U11: { min: 8, max: 10 },
-  U13: { min: 11, max: 12 },
-  U15: { min: 13, max: 14 },
+  U13: { min: 10, max: 12 },
+  U15: { min: 12, max: 14 },
 };
 const ageClassOrder = ["U11", "U13", "U15"];
 

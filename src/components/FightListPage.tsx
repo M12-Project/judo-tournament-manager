@@ -12,10 +12,16 @@ import {
   type FightListPdfMode,
 } from "../lib/fightListPdf";
 import { matchesGroupSearch } from "../lib/groupSearch";
+import {
+  getDjb2026WeightClass,
+  isDjb2026FixedWeightClassGroup,
+} from "../lib/poolLogic";
 
 interface Props {
   poolSystems: Record<string, "POOL" | "KO">;
   generatedPools: Record<string, Participant[][]>;
+  djbPoolSystems: Record<string, "POOL" | "KO">;
+  djbGeneratedPools: Record<string, Participant[][]>;
 }
 
 const formatWeight = (weight: number | string) => {
@@ -36,9 +42,17 @@ const getSystemLabel = (poolType: PoolType | null, poolSize: number) => {
     : `${poolSize} Teilnehmer - Jeder gegen jeden`;
 };
 
-function FightListPage({ poolSystems, generatedPools }: Props) {
+function FightListPage({
+  poolSystems,
+  generatedPools,
+  djbPoolSystems,
+  djbGeneratedPools,
+}: Props) {
   const [groupSearch, setGroupSearch] = useState("");
-  const poolSheets: FightListPdfSheet[] = Object.entries(generatedPools)
+  const [assignmentMode, setAssignmentMode] = useState<"free" | "djb2026">("free");
+  const activePools = assignmentMode === "free" ? generatedPools : djbGeneratedPools;
+  const activePoolSystems = assignmentMode === "free" ? poolSystems : djbPoolSystems;
+  const poolSheets: FightListPdfSheet[] = Object.entries(activePools)
     .flatMap(([groupName, pools]) =>
       pools.flatMap((participants, poolIndex) => {
         if (participants.length === 0) {
@@ -49,7 +63,11 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
           groupName,
           poolIndex,
           participants,
-          system: poolSystems[`${groupName}-${poolIndex}`] ?? "POOL",
+          system:
+            assignmentMode === "djb2026" &&
+            isDjb2026FixedWeightClassGroup(groupName)
+              ? "KO"
+              : activePoolSystems[`${groupName}-${poolIndex}`] ?? "POOL",
         }];
       })
     );
@@ -72,9 +90,23 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
             <h1>Kampflisten</h1>
           </div>
         </div>
+        <div className="btn-group mb-4" role="group" aria-label="Einteilungsmodus">
+          <button
+            type="button"
+            className={`btn ${assignmentMode === "free" ? "btn-primary" : "btn-outline-primary"}`}
+            aria-pressed={assignmentMode === "free"}
+            onClick={() => setAssignmentMode("free")}
+          >Freie Pools</button>
+          <button
+            type="button"
+            className={`btn ${assignmentMode === "djb2026" ? "btn-primary" : "btn-outline-primary"}`}
+            aria-pressed={assignmentMode === "djb2026"}
+            onClick={() => setAssignmentMode("djb2026")}
+          >DJB-Gewichtsklassen 2026</button>
+        </div>
         <div className="empty-state">
-          <h2>Noch keine Pools erstellt</h2>
-          <p>Erzeuge oder bearbeite zuerst die Einteilung im Poolgenerator.</p>
+          <h2>Noch keine {assignmentMode === "free" ? "freien Pools" : "DJB-Pools"} erstellt</h2>
+          <p>Erzeuge oder bearbeite diese Einteilung zuerst im Poolgenerator.</p>
         </div>
       </div>
     );
@@ -89,7 +121,9 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
           <p>Finale Einteilung und Kampfabläufe für den Wettkampftag.</p>
         </div>
         <div className="d-flex flex-wrap gap-2">
-          <span className="stat-chip align-self-center">{filteredPoolSheets.length} von {poolSheets.length} Pools</span>
+          <span className="stat-chip align-self-center">
+            {filteredPoolSheets.length} von {poolSheets.length} {assignmentMode === "djb2026" ? "Turnierfeldern" : "Pools"}
+          </span>
           <button className="btn btn-primary" onClick={() => downloadFightListPdf(poolSheets, "fights")}>
             Alle Kampflisten als PDF
           </button>
@@ -97,6 +131,25 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
             Alle Teilnehmerlisten als PDF
           </button>
         </div>
+      </div>
+
+      <div className="btn-group mb-4" role="group" aria-label="Einteilungsmodus">
+        <button
+          type="button"
+          className={`btn ${assignmentMode === "free" ? "btn-primary" : "btn-outline-primary"}`}
+          aria-pressed={assignmentMode === "free"}
+          onClick={() => setAssignmentMode("free")}
+        >
+          Freie Pools
+        </button>
+        <button
+          type="button"
+          className={`btn ${assignmentMode === "djb2026" ? "btn-primary" : "btn-outline-primary"}`}
+          aria-pressed={assignmentMode === "djb2026"}
+          onClick={() => setAssignmentMode("djb2026")}
+        >
+          DJB-Gewichtsklassen 2026
+        </button>
       </div>
 
       <div className="group-search-row">
@@ -127,13 +180,18 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
         const fights = system === "KO"
           ? doubleKoFights
           : createRoundRobinFights(participants);
+        const fixedDjbWeightClass =
+          assignmentMode === "djb2026" &&
+          isDjb2026FixedWeightClassGroup(groupName);
         const poolLabel = String.fromCharCode(65 + poolIndex);
 
         return (
           <section key={`${groupName}-${poolIndex}`} className="fight-section">
             <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
               <div>
-                <h2>{groupName} <span className="text-secondary">/</span> Pool {poolLabel}</h2>
+                <h2>
+                  {groupName} <span className="text-secondary">/</span> {fixedDjbWeightClass ? "DJB-KO" : `Pool ${poolLabel}`}
+                </h2>
                 <div className="d-flex flex-wrap gap-2 mt-2">
                   <span className="badge rounded-pill text-bg-light border">{participants.length} Teilnehmer</span>
                   <span className="badge rounded-pill text-bg-success">{getSystemLabel(poolType, participants.length)}</span>
@@ -157,7 +215,13 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
               <div className="table-responsive">
                 <table className="table table-sm table-hover align-middle mb-0">
                   <thead>
-                    <tr><th>Nr.</th><th>Name</th><th>Gewicht</th><th>Verein</th></tr>
+                    <tr>
+                      <th>Nr.</th>
+                      <th>Name</th>
+                      <th>Gewicht</th>
+                      {assignmentMode === "djb2026" && <th>Gewichtsklasse</th>}
+                      <th>Verein</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {participants.map((participant, index) => (
@@ -165,6 +229,15 @@ function FightListPage({ poolSystems, generatedPools }: Props) {
                         <td>{index + 1}</td>
                         <td className="fw-semibold">{participant.Vorname} {participant.Nachname}</td>
                         <td>{formatWeight(participant.Gewicht)} kg</td>
+                        {assignmentMode === "djb2026" && (
+                          <td>
+                            {getDjb2026WeightClass(
+                              participant.Altersklasse,
+                              participant.Geschlecht,
+                              Number(participant.Gewicht)
+                            ) ?? "Keine feste Gewichtsklasse"}
+                          </td>
+                        )}
                         <td>{participant.Verein}</td>
                       </tr>
                     ))}

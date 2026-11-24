@@ -14,7 +14,7 @@ const makeParticipants = (count: number): Participant[] =>
   }));
 
 describe("createDoubleKnockoutFights", () => {
-  it.each([2, 3, 4, 8, 16])(
+  it.each([2, 3, 4, 8, 16, 32])(
     "creates a routed double-elimination bracket for %i participants",
     (count) => {
       const fights = createDoubleKnockoutFights(makeParticipants(count));

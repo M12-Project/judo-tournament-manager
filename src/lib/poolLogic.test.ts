@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildPoolGroups } from "./poolLogic";
+import {
+  buildPoolGroups,
+  getDjb2026WeightClass,
+  isDjb2026FixedWeightClassGroup,
+  groupParticipantsByDjb2026WeightClass,
+} from "./poolLogic";
 import { expandParticipantsIntoStarts, normalizeParticipant } from "./participantStarts";
 import type { Participant } from "../types/Participant";
 
@@ -61,6 +66,23 @@ describe("buildPoolGroups", () => {
     ]);
   });
 
+  it("keeps every participant in free pools regardless of DJB boundaries", () => {
+    const participants = [
+      makeParticipant("A", 25, "U13", "männlich"),
+      makeParticipant("B", 28, "U13", "männlich"),
+      makeParticipant("C", 34, "U13", "männlich"),
+      makeParticipant("D", 56, "U13", "männlich"),
+    ];
+
+    const groups = buildPoolGroups(participants);
+    const groupedParticipants = Object.values(groups).flat(2);
+
+    expect(groupedParticipants).toHaveLength(participants.length);
+    expect(groupedParticipants.map((participant) => participant.Vorname).sort())
+      .toEqual(["A", "B", "C", "D"]);
+    expect(Object.keys(groups)).toEqual(["U13 - männlich"]);
+  });
+
   it("puts a double-start participant into each age-class group exactly once", () => {
     const doubleStarter = normalizeParticipant({
       ...makeParticipant("A", 42),
@@ -74,5 +96,47 @@ describe("buildPoolGroups", () => {
     expect(groups["U15 - männlich"]).toHaveLength(1);
     expect(groups["U13 - männlich"][0][0].id).toBe(doubleStarter.id);
     expect(groups["U15 - männlich"][0][0].id).toBe(doubleStarter.id);
+  });
+});
+
+describe("DJB 2026 weight classes", () => {
+  it("assigns boundary weights to the matching inclusive class", () => {
+    expect(getDjb2026WeightClass("U13", "männlich", 28)).toBe("bis 28 kg");
+    expect(getDjb2026WeightClass("U13", "männlich", 28.1)).toBe("bis 31 kg");
+    expect(getDjb2026WeightClass("U13", "männlich", 56)).toBe("+55 kg");
+  });
+
+  it("keeps genders, fixed classes, and U11 free pools separate", () => {
+    const participants = [
+      makeParticipant("U13 Junge", 28, "U13", "männlich"),
+      makeParticipant("U13 Mädchen", 28, "U13", "weiblich"),
+      makeParticipant("U11", 28, "U11", "männlich"),
+    ];
+
+    const groups = groupParticipantsByDjb2026WeightClass(participants);
+
+    expect(groups["U13 - männlich - bis 28 kg"]).toHaveLength(1);
+    expect(groups["U13 - männlich - bis 31 kg"]).toEqual([]);
+    expect(groups["U13 - männlich - +55 kg"]).toEqual([]);
+    expect(groups["U13 - weiblich - bis 30 kg"]).toHaveLength(1);
+    expect(groups["U13 - weiblich - +57 kg"]).toEqual([]);
+    expect(groups["U11 - männlich"]).toHaveLength(1);
+  });
+
+  it("keeps everyone in a fixed class together, regardless of pool settings", () => {
+    const participants = Array.from({ length: 32 }, (_, index) =>
+      makeParticipant(`Judoka ${index + 1}`, 30 + (index % 5), "U15", "männlich")
+    );
+
+    const groups = buildPoolGroups(participants, {
+      maxPoolSize: 4,
+      maxWeightSpan: 1,
+      useDjb2026WeightClasses: true,
+    });
+
+    expect(groups["U15 - männlich - bis 34 kg"]).toHaveLength(1);
+    expect(groups["U15 - männlich - bis 34 kg"][0]).toHaveLength(32);
+    expect(isDjb2026FixedWeightClassGroup("U15 - männlich - bis 34 kg")).toBe(true);
+    expect(isDjb2026FixedWeightClassGroup("U11 - männlich")).toBe(false);
   });
 });

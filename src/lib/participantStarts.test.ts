@@ -61,6 +61,16 @@ describe("participant starts", () => {
     expect(getAgeClassWarnings(participant, 2021)).toHaveLength(1);
   });
 
+  it("allows the U13-to-U15 double start at their shared age boundary", () => {
+    const participant = normalizeParticipant({
+      ...legacyParticipant,
+      Jahrgang: 2014,
+      Altersklasse: "U13, U15",
+    });
+
+    expect(getAgeClassWarnings(participant, 2026)).toEqual([]);
+  });
+
   it("warns when any selected start does not match the participant age", () => {
     const participant = normalizeParticipant({
       ...legacyParticipant,

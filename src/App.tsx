@@ -23,6 +23,13 @@ function App() {
   const [generatedPools, setGeneratedPools] =
   useState<Record<string, Participant[][]>>({});
 
+  const [djbPoolSystems, setDjbPoolSystems] = useState<
+    Record<string, "POOL" | "KO">
+  >({});
+
+  const [djbGeneratedPools, setDjbGeneratedPools] =
+    useState<Record<string, Participant[][]>>({});
+
 
   return (
     <BrowserRouter>
@@ -69,6 +76,9 @@ function App() {
                 poolSystems={poolSystems}
                 setPoolSystems={setPoolSystems}
                 setGeneratedPools={setGeneratedPools}
+                djbPoolSystems={djbPoolSystems}
+                setDjbPoolSystems={setDjbPoolSystems}
+                setDjbGeneratedPools={setDjbGeneratedPools}
               />
             }
           />
@@ -79,6 +89,8 @@ function App() {
               <FightListPage
                 poolSystems={poolSystems}
                 generatedPools={generatedPools}
+                djbPoolSystems={djbPoolSystems}
+                djbGeneratedPools={djbGeneratedPools}
               />
             }
           />
